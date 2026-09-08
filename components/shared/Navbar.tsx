@@ -10,27 +10,29 @@ const Navbar = () => {
   const [isAdmin, setIsAdmin] = useState(false);
 
   return (
-    <nav className="flex items-center justify-between border-b px-4 py-6">
-      <Link href="/" className="font-bold">
-        MyTodo
-      </Link>
+    <nav className="sticky top-0 z-50 border-b bg-background">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-6">
+        <Link href="/" className="font-bold">
+          MyTodo
+        </Link>
 
-      <div className="flex items-center gap-4">
-        <Link href="/">Home</Link>
+        <div className="flex items-center gap-4">
+          <Link href="/">Home</Link>
 
-        {isLoggedIn ? (
-          <Link href={isAdmin ? "/admin/overview" : "/user/profile"}>
-            Dashboard
-          </Link>
-        ) : (
-          <div className="flex gap-4">
-            <Link href="/auth/login">Login</Link>
+          {isLoggedIn ? (
+            <Link href={isAdmin ? "/admin/overview" : "/user/profile"}>
+              Dashboard
+            </Link>
+          ) : (
+            <div className="flex gap-4">
+              <Link href="/auth/login">Login</Link>
 
-            <Link href="/auth/registration">Register</Link>
-          </div>
-        )}
+              <Link href="/auth/registration">Register</Link>
+            </div>
+          )}
 
-        <ModeToggle />
+          <ModeToggle />
+        </div>
       </div>
     </nav>
   );
