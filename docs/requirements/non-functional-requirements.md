@@ -1,24 +1,33 @@
-# Non-Functional Requirements Specification (NFRS)
+# নন-ফাংশনাল রিকোয়ারমেন্টস স্পেসিফিকেশন (Non-Functional Requirements Specification - NFRS)
 
-This document specifies quality attributes, security standards, and performance constraints.
+> **নন-ফাংশনাল রিকোয়ারমেন্টস কী?**  
+> সিস্টেমটি কী কী কাজ করতে পারে (ফাংশনাল) তা ছাড়াও সিস্টেমটি কতটা দ্রুত, নিরাপদ, নির্ভরযোগ্য এবং সহজে মেইনটেইনযোগ্য—এই গুণগত বৈশিষ্ট্যগুলোই হলো নন-ফাংশনাল রিকোয়ারমেন্টস।
 
-## NFR-01: Security & Confidentiality
-- **NFR-01.1 Session Security**: Session tokens are transmitted exclusively in `HttpOnly`, `SameSite=Lax`, `Secure` cookies.
-- **NFR-01.2 Token Encryption**: Public share links utilize authenticated symmetric encryption via PASETO v4 local with a 256-bit key.
-- **NFR-01.3 Input Sanitation**: All inputs from HTTP requests or Server Actions are validated via strict Zod schemas before hitting business or database layers.
-- **NFR-01.4 Tenant Isolation**: Zero cross-tenant data leakage; every SQL query filtering user records is scoped by `userId`.
+---
 
-## NFR-02: Maintainability & Architectural Cleanliness
-- **NFR-02.1 Route Locality**: Components and Server Actions specific to a single route are stored in route-local `_components` and `_lib` folders.
-- **NFR-02.2 Strict Layering**: Repositories exclusively interact with Drizzle ORM; Services contain business logic; Server Actions handle orchestration.
-- **NFR-02.3 TypeScript Strict Mode**: 100% strict TypeScript typing without implicit `any` escapes.
+## 🔒 NFR-01: নিরাপত্তা ও গোপনীয়তা (Security & Confidentiality)
+- **NFR-01.1 সেশন নিরাপত্তা:** ব্যবহারকারীর লগইন সেশন টোকেন শুধুমাত্র `HttpOnly`, `SameSite=Lax`, এবং `Secure` কুকির মাধ্যমে ব্রাউজারে সংরক্ষিত ও আদান-প্রদান হবে। জাভাস্ক্রিপ্ট কোড দিয়ে এটি রিড করা সম্ভব নয় (XSS প্রতিরোধ)।
+- **NFR-01.2 টোকেন এনক্রিপশন:** পাবলিক শেয়ার লিংকে ব্যবহৃত টোকেন ২৫৬-বিট কি দিয়ে **PASETO v4 local** সিমেট্রিক এনক্রিপশনে সুরক্ষিত থাকবে।
+- **NFR-01.3 ইনপুট স্যানিটাইজেশন:** ক্লায়েন্ট ও সার্ভার অ্যাকশনের প্রতিটি ইনপুট `Zod` স্কিমা দিয়ে কঠোরভাবে যাচাই করার পর বিজনেস লেয়ার বা ডাটাবেসে যাবে (SQL Injection বা টাইপ ভুলের ঝুঁকি নেই)।
+- **NFR-01.4 মাল্টি-টেন্যান্ট আইসোলেশন:** ডাটাবেসের প্রতিটি কুয়েরিতে `userId` বাধ্যবাধকতার মাধ্যমে নিশ্চিত করা হয় যে কোনো অবস্থাতেই একজনের তথ্য অন্যজন দেখতে পারবেন না।
 
-## NFR-03: Performance & Optimization
-- **NFR-03.1 Server Components**: Static and initial page content is pre-rendered on the server to minimize client bundle sizes.
-- **NFR-03.2 Asset Compression**: Media files are compressed and converted to WebP on upload using Sharp.
-- **NFR-03.3 Fast Route Transitions**: Session validation in `proxy.ts` executes in microseconds using lightweight cookie inspection.
+---
 
-## NFR-04: Testability & Quality Assurance
-- **NFR-04.1 Unit Testing**: All Zod validation schemas, domain services, cryptographic helpers, and notification engines are covered by Vitest unit tests.
-- **NFR-04.2 Isolated Mocking**: Service tests verify business logic by mocking repository interfaces without requiring live database connections.
-- **NFR-04.3 Component Integration**: Critical UI form interactions are verified via Testing Library and jsdom.
+## 🏗️ NFR-02: মেইনটেইনেবিলিটি ও ক্লিন আর্কিটেকচার (Maintainability & Architecture)
+- **NFR-02.1 রুট লোকালিটি (Route Locality):** কোনো পেজের জন্য নির্দিষ্ট কম্পোনেন্ট এবং সার্ভার অ্যাকশন সেই রুট ফোল্ডারের ভেতরেই (`_components/` ও `_lib/`) থাকবে।
+- **NFR-02.2 কঠোর লেয়ারিং (Strict Layering):** রিপোজিটরি শুধু ডাটাবেস হ্যান্ডেল করবে, সার্ভিস লেয়ার বিজনেস লজিক দেখবে, এবং সার্ভার অ্যাকশন রুট অর্কেস্ট্রেশন করবে।
+- **NFR-02.3 কঠোর টাইপস্ক্রিপ্ট (TypeScript Strict Mode):** সম্পূর্ণ প্রজেক্টে কঠোর টাইপ যাচাই থাকবে, কোনো প্রকার আন-টাইপড `any` ব্যবহার করা যাবে না।
+
+---
+
+## ⚡ NFR-03: পারফরম্যান্স ও অপটিমাইজেশন (Performance & Optimization)
+- **NFR-03.1 সার্ভার কম্পোনেন্টস (React Server Components):** অধিকাংশ পেজের প্রাথমিক ডেটা ও লেআউট সার্ভারে রেন্ডার হবে, যার ফলে ব্রাউজারে জাভাস্ক্রিপ্ট বান্ডেলের সাইজ অত্যন্ত ছোট থাকে এবং পেজ দ্রুত লোড হয়।
+- **NFR-03.2 অ্যাসেট কম্প্রেশন:** ব্যবহারকারীর আপলোড করা ছবি সাথে সাথে WebP ফরম্যাটে সংকুচিত হয়ে স্টোরেজ ও ব্যান্ডউইথ সাশ্রয় করবে।
+- **NFR-03.3 দ্রুতগতির রুট গার্ড:** `proxy.ts`-এ লাইটওয়েট কুকি ইন্সপেকশনের মাধ্যমে মাইক্রো-সেকেন্ডে অথেনটিকেশন ও রিডাইরেকশন সম্পন্ন হবে।
+
+---
+
+## 🧪 NFR-04: টেস্টযোগ্যতা ও কোয়ালিটি অ্যাসিওরেন্স (Testability & QA)
+- **NFR-04.1 ইউনিট টেস্টিং (Unit Testing):** সমস্ত Zod ভ্যালিডেশন স্কিমা, ডোমেইন সার্ভিস, ক্রিপ্টোগ্রাফিক ফাংশন এবং নোটিফিকেশন ইঞ্জিন `Vitest` ফ্রেমওয়ার্ক দিয়ে স্বয়ংক্রিয়ভাবে টেস্ট করা থাকবে।
+- **NFR-04.2 আইসোলেটেড মকিং:** সার্ভিসের ইউনিট টেস্টে আসল ডাটাবেসের সংযোগের প্রয়োজন নেই; মক রিপোজিটরি ব্যবহার করে কয়েক মিলি-সেকেন্ডের মধ্যে নির্ভুলতা পরীক্ষা করা যাবে।
+- **NFR-04.3 কম্পোনেন্ট ইন্টিগ্রেশন:** গুরুত্বপূর্ণ ফর্ম ও UI ইন্টারঅ্যাকশনগুলো `@testing-library/react` দিয়ে টেস্ট করা থাকবে।

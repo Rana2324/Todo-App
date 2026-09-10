@@ -1,23 +1,82 @@
-# ADR 002: Layered Service-Repository Pattern
+# ADR 002: লেয়ার্ড সার্ভিস-রিপোজিটরি প্যাটার্ন (Layered Service-Repository Pattern)
 
-## Status
-Accepted
+> **লেয়ার্ড আর্কিটেকচার কী?**  
+> এটি এমন একটি সফটওয়্যার ডিজাইন পদ্ধতি যেখানে কোডকে আলাদা আলাদা স্তরে (Layers) ভাগ করা হয়। প্রতিটি স্তরের একটি নির্দিষ্ট দায়িত্ব থাকে, যা কোডকে সহজে পাঠযোগ্য, বাগ-মুক্ত এবং টেস্ট করার উপযোগী করে তোলে।
 
-## Context
-Directly embedding database queries, validation rules, external API calls, and UI state mutations in Next.js Server Actions or UI components leads to "Fat Controller" / "Fat Action" anti-patterns. This makes unit testing impossible without live databases and couples UI logic tightly to database schema definitions.
+## স্ট্যাটাস (Status)
+**গৃহীত (Accepted)** ✅
 
-## Decision
-We enforce a strict 4-tier layered architecture:
+---
+
+## প্রেক্ষাপট ও সমস্যা (Context & Problem)
+Next.js অ্যাপ্লিকেশনে নতুন ডেভেলপাররা প্রায়ই UI কম্পোনেন্ট বা Server Action-এর ভেতরে সরাসরি ডাটাবেস কোয়েরি (SQL/Drizzle), ইনপুট ভ্যালিডেশন এবং এক্সটার্নাল API কল লিখে ফেলেন। একে বলা হয় **"Fat Action"** বা **"Fat Controller"** অ্যান্টি-প্যাটার্ন।
+
+### এর ফলে যে সমস্যাগুলো সৃষ্টি হয়:
+1. **টেস্টিং অসম্ভব হওয়া:** আসল ডাটাবেস কানেকশন ছাড়া কোনো ফাংশন টেস্ট করা যায় না।
+2. **UI এবং ডাটাবেসের অতিরিক্ত নির্ভরতা (Tight Coupling):** ডাটাবেসের টেবিলে কোনো ফিল্ড বদলালে সরাসরি UI কোড নষ্ট হয়ে যায়।
+3. **কোডের পুনরাবৃত্তি (DRY নীতি লঙ্ঘন):** একই বিজনেস লজিক বিভিন্ন অ্যাকশনে বারবার লিখতে হয়।
+
+---
+
+## গৃহীত সিদ্ধান্ত (Our Decision)
+আমরা একটি স্পষ্ট **৪-স্তরের আর্কিটেকচার (4-Tier Layered Architecture)** গ্রহণ করেছি:
+
 ```
-UI Component → Server Action (_lib/actions.ts) → Domain Service (lib/services/) → Repository (drizzle/) → Database
+┌────────────────────────────────────────────────────────┐
+│ 1. UI Component (React Client/Server Component)       │
+└───────────────────────────┬────────────────────────────┘
+                            │ (ইউজারের ইনপুট পাঠায়)
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│ 2. Server Action (_lib/actions.ts)                     │
+│    - রুট-লোকাল সমন্বয়কারী (Orchestrator)              │
+│    - Zod স্কিমা দিয়ে ইনপুট ভ্যালিডেশন করে               │
+│    - ইউজারের সেশন চেক করে (`requireUserId()`)          │
+└───────────────────────────┬────────────────────────────┘
+                            │ (ভ্যালিডেট করা ডাটা পাঠায়)
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│ 3. Domain Service (lib/services/*)                    │
+│    - আসল বিজনেস লজিক ও রুলস ধারণ করে                    │
+│    - ডাটাকে সুন্দর ও ক্লিন ডোমেইন মডেলে রূপান্তর করে   │
+│    - সরাসরি কোনো SQL কোয়েরি চালায় না                   │
+└───────────────────────────┬────────────────────────────┘
+                            │ (ডাটাবেস অপারেশনের অনুরোধ পাঠায়)
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│ 4. Repository Layer (drizzle/*.repository.ts)          │
+│    - একমাত্র স্তর যা ডাটাবেসের (`db`) সাথে কথা বলে     │
+│    - প্রতি কোয়েরিতে বাধ্যতামূলকভাবে `userId` ফিল্টার   │
+└───────────────────────────┬────────────────────────────┘
+                            │ (SQL Execute)
+                            ▼
+               [( Neon PostgreSQL Database )]
 ```
 
-1. **Validation Layer (`schema/`)**: Zod schemas act as the single source of truth for runtime input validation.
-2. **Server Actions (`_lib/actions.ts`)**: Thin orchestrators. They authenticate the user (`requireUserId()`), parse inputs with Zod, invoke the appropriate domain service, and call `revalidatePath()`.
-3. **Domain Services (`lib/services/`)**: Contain pure business logic and data mapping (e.g. converting raw database rows with nulls to UI-friendly domain models). Never touches SQL or Drizzle directly.
-4. **Repositories (`drizzle/*.repository.ts`)**: The ONLY files in the application permitted to import the database instance (`db`) or execute SQL queries. Every query is scoped by `userId` to enforce tenant isolation.
+---
 
-## Consequences
-- **Testability**: Services can be unit tested with mock repositories in milliseconds without needing a real database.
-- **Maintainability**: Swapping database drivers or changing schema column types only affects the repository layer.
-- **Security**: Hard tenant isolation is enforced at the repository query boundary.
+## প্রতিটি লেয়ারের দায়িত্বের বিবরণ (Layer Breakdown)
+
+### ১. ভ্যালিডেশন লেয়ার (`schema/`):
+- `Zod` লাইব্রেরি দিয়ে ইনপুটের নিয়ম (যেমন: টাইটেল সর্বোচ্চ ২০০ অক্ষর, ইমেইল সঠিক ফরম্যাট) নির্ধারিত থাকে।
+
+### ২. সার্ভার অ্যাকশন (`_lib/actions.ts`):
+- ইউজারের সেশন থেকে `userId` বের করে।
+- Zod স্কিমা দিয়ে ডাটা যাচাই করে।
+- সংশ্লিষ্ট সার্ভিসকে কল করে এবং পেজ রিফ্রেশের জন্য `revalidatePath()` ট্রিগার করে।
+
+### ৩. ডোমেইন সার্ভিস (`lib/services/`):
+- বিজনেস লজিক হ্যান্ডেল করে (যেমন: AI সাজেশন যোগ করা, নোটিফিকেশন পাঠানো)।
+- ডাটাবেসের কাঁচা রেকর্ডকে (Raw rows) ফ্রন্টএন্ড-বান্ধব টাইপ অবজেক্টে রূপান্তর করে।
+
+### ৪. রিপোজিটরি (`drizzle/*.repository.ts`):
+- অ্যাপ্লিকেশনের **একমাত্র স্থান** যা Drizzle ORM ক্লায়েন্ট ইমপোর্ট করে এবং ডাটাবেস কোয়েরি এক্সিকিউট করে।
+- প্রতিটি কোয়েরিতে কঠোরভাবে ইউজারের `userId` নিশ্চিত করে ডেটা আইসোলেশন বজায় রাখে।
+
+---
+
+## ফলাফল ও সুবিধা (Consequences & Benefits)
+
+- 🧪 **সহজ ইউনিট টেস্টিং (Testability):** ডাটাবেস ছাড়াই মক রিপোজিটরি দিয়ে সার্ভিসের সব লজিক মাত্র কয়েক মিলি-সেকেন্ডে টেস্ট করা যায়।
+- 🛡️ **উচ্চ নিরাপত্তা (Multi-Tenant Isolation):** অন্য ইউজারের ডেটা দেখার কোনো ঝুঁকি থাকে না কারণ রিপোজিটরিতে `userId` বাধ্যতামূলক।
+- 🔧 **সহজ পরিবর্তনযোগ্যতা (Maintainability):** ভবিষ্যতে ডাটাবেস বা ORM পরিবর্তন করতে হলে শুধু রিপোজিটরি ফাইলটি বদলালেই চলবে, মূল বিজনেস লজিক বা UI-তে কোনো প্রভাব পড়বে না।

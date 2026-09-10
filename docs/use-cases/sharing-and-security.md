@@ -1,21 +1,39 @@
-# Use Case: Cryptographic Sharing & Public Access
+# ইউজ কেস: ক্রিপ্টোগ্রাফিক শেয়ারিং ও পাবলিক অ্যাক্সেস (Cryptographic Sharing)
 
-## Primary Actor
-Authenticated Todo Owner & External Public Recipient
+---
 
-## Pre-conditions
-- Owner is authenticated and owns the specific Todo item.
+## 👤 প্রধান চরিত্র বা অ্যাক্টর (Primary Actor)
+- **টুডুর মালিক (Todo Owner):** লগইন করা ব্যবহারকারী যিনি টুডুটি তৈরি করেছেন।
+- **পাবলিক ভিজিটর (Public Viewer):** বাইরের যে কোনো ব্যক্তি যিনি কোনো অ্যাকাউন্ট বা লগইন ছাড়াই লিংকটি দেখতে চান।
 
-## Main Success Scenario
-1. Todo owner clicks the "Share" action on a Todo item.
-2. Server Action calls `shareService.createShareLink(userId, todoId)`.
-3. System verifies ownership, constructs `{ todoId }` payload, and encrypts it using PASETO v4 local with symmetric key `PASETO_LOCAL_KEY`.
-4. The generated link `/share/[token]` is displayed and copied to the owner's clipboard.
-5. Owner shares link with an external party.
-6. Recipient opens `/share/[token]` in any browser (no login required).
-7. Server Component on `/share/[token]/page.tsx` calls `shareService.getSharedTodo(token)`.
-8. System decrypts and cryptographically verifies token payload.
-9. Database retrieves the specific Todo item and renders a clean, read-only public card.
+---
 
-## Alternative Scenarios
-- **Tampered / Expired Token**: If the token string is altered or invalid, PASETO verification fails (`null`), and the page renders a clean 404 / "Invalid or expired share link" message.
+## 📋 পূর্বশর্ত (Pre-conditions)
+- টুডুর মালিক লগইন আছেন এবং ওই টুডুর আসল স্বত্বাধিকারী।
+
+---
+
+## 🚀 মূল সফল দৃশ্যপট (Main Success Scenario)
+
+1. **শেয়ার বাটনে ক্লিক:** টুডুর মালিক তার ড্যাশবোর্ডের কোনো নির্দিষ্ট টুডু কার্ডের "Share" বাটনে ক্লিক করেন।
+2. **সার্ভার অ্যাকশন কল:** সিস্টেম `shareService.createShareLink(userId, todoId)` কল করে।
+3. **মালিকানা যাচাই ও টোকেন এনক্রিপশন:**
+   - সার্ভিস লেয়ার নিশ্চিত করে যে অনুরোধকারী ব্যক্তিই টুডুটির আসল মালিক।
+   - `{ todoId }` ডাটাকে **PASETO v4 local** এবং ২৫৬-বিট কি দিয়ে একটি সম্পূর্ণ এনক্রিপ্টেড টোকেনে রূপান্তর করা হয়।
+4. **লিংক প্রাপ্তি:** ব্যবহারকারী একটি শেয়ারেবল লিঙ্ক পান (যেমন: `/share/v4.local.AB12...`) এবং তা স্বয়ংক্রিয়ভাবে ক্লিপবোর্ডে কপি হয়ে যায়।
+5. **বন্ধুদের সাথে শেয়ার:** মালিক লিংকটি ইমেইল বা মেসেঞ্জারে অন্য কারও সাথে শেয়ার করেন।
+6. **পাবলিক ভিউয়ার কর্তৃক ওপেন:** প্রাপক কোনো লগইন ছাড়াই যেকোনো ব্রাউজারে লিংকটি ওপেন করেন।
+7. **সার্ভার-সাইড ডিক্রিপশন:** `/share/[token]/page.tsx` পেজটি `shareService.getSharedTodo(token)` কল করে টোকেনটি ডিক্রিপ্ট ও সত্যতা নিশ্চিত করে।
+8. **নিরাপদ তথ্য প্রদর্শন:** ডাটাবেস থেকে কেবল সেই নির্দিষ্ট টুডুর তথ্য আনা হয় এবং রিড-অনলি মোডে একটি সুন্দর কার্ড হিসেবে স্ক্রিনে প্রদর্শন করা হয়।
+
+---
+
+## ⚠️ বিকল্প দৃশ্যপট (Alternative Scenarios)
+
+### ১. মেয়াদোত্তীর্ণ বা বিকৃত টোকেন (Tampered or Expired Token):
+- যদি কোনো ব্যবহারকারী URL-এ থাকা টোকেনের একটি অক্ষরও পরিবর্তন করেন বা টোকেনের মেয়াদ শেষ হয়ে যায়:
+  - PASETO ভেরিফিকেশন ফেইল করে এবং `null` রিটার্ন করে।
+  - সার্ভার সরাসরি একটি পরিচ্ছন্ন "Invalid or expired share link" / 404 পেজ রেন্ডার করে।
+
+### ২. অন্যের টুডু শেয়ার করার অপচেষ্টা:
+- যদি কেউ অন্য ইউজারের `todoId` পাঠিয়ে শেয়ার লিংক জেনারেট করার চেষ্টা করে, সার্ভিস লেয়ারে মালিকানা যাচাইয়ে ব্যর্থ হয়ে সাথে সাথে এক্সেস ডিনাইড ত্রুটি প্রদান করে।

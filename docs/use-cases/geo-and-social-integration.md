@@ -1,16 +1,30 @@
-# Use Case: Geolocation & Social Media Integration
+# ইউজ কেস: জিওলোকেশন ও সোশ্যাল মিডিয়া ইন্টিগ্রেশন (Geo & Social Integration)
 
-## Primary Actor
-Authenticated User
+---
 
-## Pre-conditions
-- User has created at least one Todo item.
+## 👤 প্রধান চরিত্র বা অ্যাক্টর (Primary Actor)
+লগইন করা সাধারণ ব্যবহারকারী (Authenticated User)
 
-## Main Success Scenario
-1. User clicks the "Attach Place" button on a Todo item.
-2. Search modal opens; user types a venue name (e.g. "Central Cafe").
-3. Server Action calls `placeService.searchPlaces(query)` which queries Geoapify (or returns mock matches).
-4. User selects a place from search results; `todoService.attachPlace` writes location coordinates and place name to the database row.
-5. User clicks the attached location badge to open the Place Insights dialog.
-6. System concurrently fetches Google Business Profile ratings/hours via `gbpService` and recent social media posts via `instagramService`.
-7. UI displays rich venue details directly inside the Todo dashboard.
+---
+
+## 📋 পূর্বশর্ত (Pre-conditions)
+- ব্যবহারকারী লগইন অবস্থায় আছেন এবং তার তালিকায় অন্তত একটি টুডু আইটেম রয়েছে।
+
+---
+
+## 🚀 মূল সফল দৃশ্যপট (Main Success Scenario)
+
+1. **লোকেশন বাটনে ক্লিক:** ব্যবহারকারী একটি টুডু আইটেমের উপর থাকা "Attach Place" বাটনে ক্লিক করেন।
+2. **সার্চ ডায়ালগ ওপেন:** স্ক্রিনে একটি সুন্দর সার্চ মোডাল খোলে এবং ব্যবহারকারী যেকোনো স্থানের নাম (যেমন: "Dhanmondi Lake" বা "Central Cafe") টাইপ করেন।
+3. **স্থান অনুসন্ধান:** সার্ভার অ্যাকশন `placeService.searchPlaces(query)` কল করে যা Geoapify API থেকে (অথবা কনফিগারেশন না থাকলে মক ডাটা থেকে) প্রাসঙ্গিক স্থানের তালিকা নিয়ে আসে।
+4. **স্থান নির্বাচন ও সংরক্ষণ:** ব্যবহারকারী সার্চ রেজাল্ট থেকে কাঙ্ক্ষিত স্থানটি ক্লিক করেন; সাথে সাথে `todoService.attachPlace` ফাংশন ডাটাবেসে ওই টুডুর রো-তে স্থানটির নাম এবং অক্ষাংশ-দ্রাঘিমাংশ (Latitude/Longitude) সেভ করে।
+5. **স্থান ইনসাইট পরিদর্শন:** ব্যবহারকারী টুডুতে প্রদর্শিত লোকেশন ব্যাজে ক্লিক করলে "Place Insights" ডায়ালগ ওপেন হয়।
+6. **সোশ্যাল ও বিজনেস ডেটা ফেচ:** সিস্টেম একই সাথে দুটি কাজ করে:
+   - `gbpService` দিয়ে Google Business Profile-এর স্টার রেটিং, রিভিউ সংখ্যা এবং খোলার সময় নিয়ে আসে।
+   - `instagramService` দিয়ে ওই স্থানের সাম্প্রতিক সোশ্যাল মিডিয়া পোস্ট ও ক্যাপশন প্রদর্শন করে।
+7. **রিচ ভিউ ডিসপ্লে:** ব্যবহারকারী কোনো বাড়তি অ্যাপে না গিয়ে সরাসরি তার টুডু ড্যাশবোর্ড থেকেই স্থানটির সম্পূর্ণ লাইভ তথ্য দেখতে পান।
+
+---
+
+## 🛡️ অফলাইন ও ফলব্যাক মোড (Fallback Scenario)
+- ইন্টারনেটে সমস্যা থাকলে বা Geoapify/Google API Key না থাকলেও কোনো এরর দেখা দেবে না; সিস্টেম প্রি-বিল্ট ডামি লোকেশন ও সোশ্যাল ফিড প্রদর্শন করবে।

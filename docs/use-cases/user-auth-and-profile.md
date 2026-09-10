@@ -1,26 +1,44 @@
-# Use Case: User Authentication & Profile Management
+# ইউজ কেস: ইউজার অথেনটিকেশন ও প্রোফাইল ম্যানেজমেন্ট (User Auth & Profile)
 
-## Primary Actor
-End User (Unauthenticated or Authenticated)
+---
 
-## Pre-conditions
-- User has access to a modern web browser.
-- Network connection to the server is active.
+## 👤 প্রধান চরিত্র বা অ্যাক্টর (Primary Actor)
+শেষ ব্যবহারকারী (End User - Unauthenticated or Authenticated)
 
-## Main Success Scenario (Registration & Login)
-1. User visits `/registration` and fills in name, email, password, and password confirmation.
-2. Client-side form validates input shape via `registerSchema` (Zod).
-3. Better Auth `signUp.email` creates the user account in Neon Postgres, generates a session, and sets the `better-auth.session_token` cookie.
-4. Browser receives success response and redirects to `/todos`.
-5. User navigates to `/profile` to view their account metadata, role, and active session status.
+---
 
-## Scenario: Password Change
-1. User navigates to `/change-password` (or clicks "Change Password" in `/profile`).
-2. User provides `currentPassword`, `newPassword` (min 6 chars), and `confirmPassword`.
-3. User selects whether to revoke active sessions across other devices.
-4. `ChangePasswordForm` validates schema and invokes `authClient.changePassword`.
-5. On success, a toast confirmation appears and the user is redirected to `/profile`.
+## 📋 পূর্বশর্ত (Pre-conditions)
+- ব্যবহারকারীর একটি আধুনিক ওয়েব ব্রাউজার রয়েছে এবং সার্ভারের সাথে ইন্টারনেট কানেকশন সচল আছে।
 
-## Alternative Scenarios
-- **Invalid Credentials**: Toast error alert displays "Invalid email or password", and the user stays on `/login`.
-- **Session Expired**: Middleware / `proxy.ts` detects missing session cookie and redirects user to `/login`.
+---
+
+## 🚀 মূল সফল দৃশ্যপট (Main Success Scenario)
+
+### ১. রেজিস্ট্রেশন ও স্বয়ংক্রিয় লগইন (Registration):
+1. নতুন ব্যবহারকারী `/registration` পেজে গিয়ে নাম, ইমেইল, পাসওয়ার্ড এবং পাসওয়ার্ড কনফার্মেশন পূরণ করেন।
+2. ক্লায়েন্ট-সাইডে `registerSchema` (Zod) দিয়ে ইনপুট ফরম্যাট যাচাই করা হয়।
+3. Better Auth-এর `signUp.email` মেথড ডাটাবেসে নতুন ব্যবহারকারীর রেকর্ড তৈরি করে, একটি নিরাপদ সেশন জেনারেট করে এবং ব্রাউজারে `better-auth.session_token` কুকি সেট করে।
+4. ব্রাউজার সফল সংকেত পেয়ে সরাসরি সুরক্ষিত ড্যাশবোর্ড `/todos`-এ রিডাইরেক্ট করে।
+
+### ২. নিয়মিত লগইন (Login):
+1. নিবন্ধিত ব্যবহারকারী `/login` পেজে ইমেইল ও পাসওয়ার্ড প্রদান করেন।
+2. সার্ভার ক্রেডেনশিয়াল ও পাসওয়ার্ড হ্যাশ যাচাই করে ব্রাউজারে সেশন কুকি প্রদান করে এবং ড্যাশবোর্ডে পাঠায়।
+
+### ৩. প্রোফাইল ও সেশন তথ্য পরিদর্শন (Profile):
+1. ব্যবহারকারী `/profile` পেজে গিয়ে তার নাম, ইমেইল, রোল (`user` বা `admin`), অ্যাকাউন্ট আইডি এবং বর্তমান সেশনের মেয়াদ দেখতে পান।
+
+### ৪. পাসওয়ার্ড পরিবর্তন (Change Password):
+1. ব্যবহারকারী `/change-password` পেজে যান (বা প্রোফাইল থেকে "Change Password" বোতামে চাপেন)।
+2. বর্তমান পাসওয়ার্ড এবং নতুন পাসওয়ার্ড (ন্যূনতম ৬ অক্ষর) ইনপুট দেন।
+3. তিনি চাইলে অন্যান্য ডিভাইসে চালু থাকা সেশনগুলো বন্ধ (Revoke Other Sessions) করার অপশন সিলেক্ট করতে পারেন।
+4. `authClient.changePassword` ব্যাকএন্ডে পাসওয়ার্ড আপডেট করে এবং একটি সাকসেস টোস্ট নোটিফিকেশন প্রদর্শন করে ব্যবহারকারীকে প্রোফাইলে ফিরিয়ে আনে।
+
+---
+
+## ⚠️ বিকল্প দৃশ্যপট (Alternative Scenarios)
+
+### ১. ভুল ইমেইল বা পাসওয়ার্ড (Invalid Credentials):
+- ব্যবহারকারী ভুল পাসওয়ার্ড দিলে স্ক্রিনে স্পষ্ট "Invalid email or password" বার্তা প্রদর্শিত হয় এবং ইউজার লগইন পেজেই অবস্থান করেন।
+
+### ২. সেশনের মেয়াদ শেষ (Session Expired):
+- যদি ইউজারের সেশন কুকির মেয়াদ শেষ হয়ে যায় বা মুছে ফেলা হয়, তবে `proxy.ts` তাকে সুরক্ষিত পেজগুলোতে ঢুকতে না দিয়ে সাথে সাথে `/login` পেজে রিডাইরেক্ট করে।

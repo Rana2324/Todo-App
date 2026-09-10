@@ -1,230 +1,569 @@
-# 🧭 Todo App Playbook
+# 🧭 Todo App Playbook: সম্পূর্ণ প্রজেক্টের বিগিনার লার্নিং গাইড (Beginner → Intermediate → Advanced)
 
-তোমার Todo প্রজেক্টে Auth (Better Auth), Database (Drizzle + Neon Postgres), Server Actions, Admin Authorization, আর এখন একটা layered architecture (Zod + Service + Repository) ও automated test (Vitest) যোগ হয়েছে। এই ডকুমেন্টে আছে — কোন ফাইল কী কাজ করে, ডেটা কীভাবে প্রবাহিত হয় (Mermaid diagram সহ), আর প্রতিটা feature নিজে হাতে কীভাবে test করবে।
+স্বাগতম! এই প্লেবুকটি আমাদের **Todo Application** কোডবেসের প্রতিটি অংশের বাস্তব কার্যপদ্ধতি, ডাটা ফ্লো এবং আর্কিটেকচার অত্যন্ত সহজবোধ্য ও শিক্ষণীয় বাংলা ভাষায় ব্যাখ্যা করার জন্য তৈরি করা হয়েছে।
 
-**Stack:** Next.js App Router · Better Auth · Drizzle ORM · Neon Postgres · Server Actions · Zod · Vitest + Testing Library
-
----
-
-## ১. কী বানানো হয়েছে
-
-শুরুতে todos শুধু browser-এর memory-তে (`useState`) থাকত — reload দিলেই হারিয়ে যেত, আর কোনো "user" ধারণাই ছিল না। এখন:
-
-- ✅ প্রতিটা user নিজের email/password দিয়ে **Register** ও **Login** করতে পারে (Better Auth)
-- ✅ Todo এখন সত্যিকারের database-এ (Neon Postgres) সংরক্ষিত হয় — reload দিলে হারায় না
-- ✅ একজন user শুধু **নিজের** todo দেখতে/বদলাতে পারবে, অন্য কারো না
-- ✅ `/user/*` ও `/admin/*` route শুধু login করা থাকলেই খোলে, আর Admin route শুধু admin role-এর জন্য
-- ✅ প্রতিটা Server Action-এ ঢোকা data এখন **Zod** দিয়ে validate হয়, DB পর্যন্ত ভুল data পৌঁছায় না
-- ✅ Code এখন একটা পরিষ্কার **layered architecture**-এ ভাগ করা (Action → Service → Repository) — একসাথে গুলিয়ে থাকা logic এখন আলাদা আলাদা দায়িত্বে ভাগ করা
-- ✅ **Automated test** (Vitest + Testing Library) আছে যা প্রতিবার code বদলালে স্বয়ংক্রিয়ভাবে check করে কিছু ভেঙেছে কিনা
+একজন নতুন ডেভেলপার যেন প্রজেক্টের যেকোনো কোড দেখে বুঝতে পারেন:
+- **কোডটি কোথায় আছে এবং কেন সেখানে রাখা হয়েছে**
+- **ফাংশনটি কোথা থেকে কল হচ্ছে, কী ইনপুট নিচ্ছে এবং কী আউটপুট দিচ্ছে**
+- **ভবিষ্যতে নতুন কোনো ফিচার বা UI যোগ করতে হলে কোন কোন ফোল্ডার ও ফাইলে হাত দিতে হবে**
 
 ---
 
-## ২. সিস্টেম Flow
+## 🏗️ মূল আর্কিটেকচারাল ফ্লো (The 10-Step Flow)
 
-### ছবি ১ — Login/Register কীভাবে Session Cookie বানায়
+আমাদের পুরো সিস্টেমে যেকোনো কাজ নিচের ১০টি সুশৃঙ্খল ধাপ অনুসরণ করে সম্পন্ন হয়:
 
-```mermaid
-sequenceDiagram
-    participant B as Browser
-    participant R as route.ts<br/>(/api/auth/[...all])
-    participant A as lib/auth.ts<br/>(betterAuth config)
-    participant D as Neon Postgres<br/>(user + session)
-
-    B->>R: POST /sign-up/email<br/>{name, email, password}
-    R->>A: handle request
-    A->>D: hash password, insert user
-    A->>D: create session row
-    D-->>A: user + session data
-    A-->>B: Set-Cookie: better-auth.session_token<br/>(httpOnly, secure)
+```
+[1. Requirement] ──► [2. Design & ADR] ──► [3. Route & Page] ──► [4. Schema (Zod)]
+                                                                           │
+┌──────────────────────────────────────────────────────────────────────────┘
+▼
+[5. Action (Server)] ──► [6. Service (Logic)] ──► [7. Repository] ──► [8. Database]
+                                                                           │
+┌──────────────────────────────────────────────────────────────────────────┘
+▼
+[9. Test (Vitest)] ──► [10. Review & Deploy]
 ```
 
-> এই cookie-ই পরের প্রতিটা request-এ প্রমাণ করে "তুমি কে"। `role: "user"` ডিফল্ট হিসেবে বসে (admin plugin-এর কাজ)।
+---
 
-### ছবি ২ — Todo Page কীভাবে DB থেকে Data আনে ও বদলায় (Layered Architecture সহ)
+## 📊 ভিজ্যুয়াল আর্কিটেকচার ডায়াগ্রামসমূহ (Visual Architecture Diagrams)
+
+সহজে ও পরিষ্কারভাবে পুরো সিস্টেম বোঝার জন্য নিচে ৩টি ফোকাসড Mermaid ডায়াগ্রাম দেওয়া হলো:
+
+### ১. High-Level Architecture (মূল লেয়ারসমূহের সামগ্রিক স্তর)
 
 ```mermaid
 flowchart TD
-    A[Browser: GET /user/todos] --> B{proxy.ts<br/>session cookie আছে?}
-    B -- "না" --> R[redirect → /auth/login]
-    B -- "হ্যাঁ" --> C["page.tsx<br/>(Server Component)"]
-    C -->|"todoService.listForUser(userId)"| S1["todo.service.ts<br/>(business logic)"]
-    S1 -->|"findByUserId(userId)"| REPO[("todo.repository.ts<br/>শুধু এখানেই Drizzle import হয়")]
-    REPO --> DB[("Neon: todos table")]
-    DB -->|শুধু নিজের todo rows| E["Todo.tsx<br/>(initialTodos prop)"]
-    E -->|"Add / Edit / Toggle / Delete ক্লিক"| F["actions.ts<br/>(Server Action)"]
-    F -->|"১. requireSession()<br/>২. zod schema.parse(input)"| VZ["Zod validate + Auth check"]
-    VZ -->|"todoService.create/update/toggle/remove"| S1
-    S1 -->|"scoped insert/update/delete"| REPO
-    DB -->|নতুন/বদলানো row ফেরত| E
-    E -->|setTodos| C
+    UI["১. Browser / UI Layer<br/><code>apps/web/app/.../_components</code>"]
+    
+    subgraph App["২. Next.js App Shell"]
+        Guard["Route Security Guard<br/><code>proxy.ts</code>"]
+        Actions["Server Actions<br/><code>_lib/actions.ts</code>"]
+    end
+
+    Core["৩. Business & Domain Core<br/><code>apps/web/lib/services/*</code> ও <code>schema/*</code>"]
+
+    subgraph DataExternal["৪. Data & External Layer"]
+        Repo["Repositories & Database<br/><code>apps/web/drizzle/</code> ➔ Postgres"]
+        Prov["External Providers & APIs<br/><code>apps/web/lib/providers/</code>"]
+    end
+
+    UI -.->|"Navigation (পেজ ভিজিট)"| Guard
+    UI -->|"Form Submit / User Action"| Actions
+    Actions --> Core
+    Core --> Repo
+    Core --> Prov
 ```
 
-> এখানেই আসল নিরাপত্তা: প্রতিটা DB query-তে `userId` দিয়ে scope করা থাকে (Repository-তে) — login করা মানেই না যে সবার todo access করা যাবে। আর প্রতিটা write-এর আগে Zod দিয়ে data shape validate হয় (Action-এ) — ভুল/অতিরিক্ত বড় data DB পর্যন্ত পৌঁছায়ই না।
+> **ব্যাখ্যা:**  
+> - **Browser/UI Layer:** ইউজার ব্রাউজারে ইন্টারঅ্যাক্ট করেন। পেজ পরিবর্তনের সময় `proxy.ts` রুট গার্ড সেশন যাচাই করে।
+> - **Next.js App Shell:** ব্যবহারকারীর ফর্ম সাবমিশনগুলো সার্ভার অ্যাকশনে আসে।
+> - **Business/Domain Core:** ইনপুট ভ্যালিডেশন এবং মূল বিজনেস লজিক প্রক্রিয়াজাত করে।
+> - **Data & External Providers:** ডেটাবেস অপারেশন এবং থার্ড-পার্টি API (OpenAI, S3, Maps) কলগুলো হ্যান্ডেল করে।
 
 ---
 
-## ৩. Layered Architecture — কেন এভাবে ভাগ করা হয়েছে
+### ২. Todo Request Flow (রিকোয়েস্ট ও ডেটা প্রবাহের পূর্ণাঙ্গ চক্র)
 
+```mermaid
+flowchart LR
+    UI["UI Component<br/><code>TodoForm.tsx</code>"]
+    Action["Server Action<br/><code>actions.ts</code>"]
+    Zod["Zod Validation<br/><code>schema/todo.ts</code>"]
+    Auth["Auth Check<br/><code>requireUserId()</code>"]
+    Service["Domain Service<br/><code>todo.service.ts</code>"]
+    Repo["Repository<br/><code>todo.repository.ts</code>"]
+    DB[("PostgreSQL<br/><code>todos table</code>")]
+
+    UI -->|"১. Submit"| Action
+    Action -->|"২. Validate"| Zod
+    Zod -->|"৩. Verify Session"| Auth
+    Auth -->|"৪. Business Logic"| Service
+    Service -->|"৫. SQL Query"| Repo
+    Repo -->|"৬. INSERT / UPDATE"| DB
 ```
-UI (Todo.tsx)  →  Server Action (actions.ts)  →  Zod + Auth check  →  Service  →  Repository  →  DB
+
+> **ব্যাখ্যা:**  
+> ১. ইউজার ফর্ম সাবমিট করলে Server Action কল হয়।  
+> ২. Zod স্কিমা ইনপুটের আকার ও টাইপ যাচাই করে।  
+> ৩. `requireUserId()` সেশন থেকে ইউজারের পরিচয় নিশ্চিত করে।  
+> ৪. Domain Service বিজনেস লজিক ও ডেটা রূপান্তর পরিচালনা করে।  
+> ৫. Repository কুয়েরিতে ইউজারের `userId` বাধ্যতামূলকভাবে ফিল্টার করে PostgreSQL ডাটাবেসে সেভ করে।
+
+---
+
+### ৩. External Provider Flow (এক্সটার্নাল সার্ভিস ও স্মার্ট ফলব্যাক)
+
+```mermaid
+flowchart TD
+    Service["বিজনেস সার্ভিসেস<br/><code>lib/services/*</code> ও <code>lib/ai/*</code>"] --> Check{"lib/env.ts<br/>API Key কনফিগার করা আছে?"}
+
+    Check -- "হ্যাঁ (Configured)" --> RealAPI["রিয়েল এক্সটার্নাল API<br/>OpenAI / S3 / Geoapify"]
+    Check -- "না বা সংযোগ বিচ্ছিন্ন" --> Mock["স্মার্ট মক ফলব্যাক<br/>Deterministic Fallback Data"]
+
+    RealAPI --> Clean["ক্লিন ডোমেন মডেল<br/><code>lib/domain/*</code>"]
+    Mock --> Clean
 ```
 
-| Layer | ফাইল | দায়িত্ব |
-|---|---|---|
-| **Validation** | `lib/validations/todo.ts` | Input-এর shape/size ঠিক আছে কিনা — একমাত্র সত্যের উৎস (single source of truth) |
-| **Repository** | `lib/repositories/todo.repository.ts` | শুধু DB-র সাথে কথা বলা (Drizzle query) — **এটাই একমাত্র ফাইল যেখানে `db` সরাসরি import হয়** |
-| **Service** | `lib/services/todo.service.ts` | Business logic — DB row-কে UI-এর জন্য উপযুক্ত shape-এ (TodoType) রূপান্তর করা |
-| **Server Action** | `actions.ts` | পাতলা (thin) — session check → Zod parse → Service কল → `revalidatePath` |
-
-**কেন এই ভাগাভাগি লাভজনক (আগে সবকিছু `actions.ts`-এ মেশানো ছিল):**
-- Repository বদলালেও (ধরো Postgres থেকে অন্য DB-তে যাওয়া লাগলে) Service/Action-এর কিছু বদলাতে হয় না
-- Service-কে আলাদাভাবে test করা যায় (নিচে দেখো), আসল database ছাড়াই
-- প্রতিটা ফাইল ছোট ও একটাই কাজ করে — পড়তে/বুঝতে সহজ
+> **ব্যাখ্যা:**  
+> কোনো সার্ভিসে থার্ড-পার্টি API প্রয়োজন হলে প্রথমে `lib/env.ts` চেক করে। API Key অনুপস্থিত বা নেটওয়ার্ক ফেইল করলেও অ্যাপ কখনো ক্র্যাশ করে না; বরং বুদ্ধিমান মক ডেটা দিয়ে ফ্রন্টএন্ডে ক্লিন ডোমেন মডেল রিটার্ন করে।
 
 ---
 
-## ৪. ফাইল রেফারেন্স — কোনটা কী কাজ করে
-
-🟢 = নতুন ফাইল · 🟠 = বদলানো ফাইল
-
-| ফাইল | কাজ |
-|---|---|
-| `.env.local` | 🟠 সব secret এখানে — `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `PASETO_LOCAL_KEY`, আর optional external API key |
-| `drizzle.config.ts` | 🟠 drizzle-kit কে বলে দেয় কোন schema file (todos + auth) থেকে migration বানাতে হবে |
-| `app/db/auth-schema.ts` | 🟢 Better Auth CLI-generated — `user`, `session`, `account`, `verification` টেবিল |
-| `app/db/schema.ts` | 🟠 `todos` টেবিলে `userId` foreign key যোগ হয়েছে — কার todo সেটা track করার জন্য |
-| `app/db/index.ts` | 🟠 Drizzle client, দুই schema (auth + todos) একসাথে wire করা |
-| `lib/auth.ts` | 🟠 Better Auth-এর মূল server config — email/password, admin plugin, DB adapter |
-| `lib/auth-client.ts` | 🟢 Browser থেকে ব্যবহারের জন্য — `useSession`, `signIn`, `signUp`, `signOut` |
-| `lib/auth-helpers.ts` | 🟢 `requireSession()`/`requireUserId()` — Server Action/Page থেকে session read করার জন্য একটাই জায়গা (আগে duplicate ছিল) |
-| `lib/env.ts` | 🟢 Zod দিয়ে required env var check করে; optional external service (OpenAI/S3/…) configured কিনা জানানোর জন্য `isXConfigured()` helper |
-| `lib/validations/todo.ts` | 🟢 Zod schema — `createTodoSchema`, `updateTodoSchema`, `todoIdSchema` |
-| `lib/repositories/todo.repository.ts` | 🟢 শুধুমাত্র এই ফাইল Drizzle দিয়ে সরাসরি `todos` টেবিল ছোঁয় |
-| `lib/services/todo.service.ts` | 🟢 Repository-কে wrap করে, DB row-কে `TodoType`-এ রূপান্তর করে |
-| `app/api/auth/[...all]/route.ts` | 🟢 Better Auth-এর সব request (login/register/session) এখানে এসে পড়ে |
-| `app/(public)/auth/login/page.tsx` | 🟠 এখন real `signIn.email()` কল করে, loading state + error toast সহ |
-| `app/(public)/auth/registration/page.tsx` | 🟠 এখন real `signUp.email()` কল করে |
-| `proxy.ts` | 🟢 `/user/*` ও `/admin/*`-এ ঢোকার আগে session cookie চেক করে, না থাকলে login-এ পাঠায় |
-| `components/shared/Navbar.tsx` | 🟠 Hardcoded state বাদ, এখন real `useSession()` দিয়ে Login/Dashboard/Log-out দেখায়, Log out-এর পর সরাসরি redirect করে |
-| `app/(private)/user/todos/page.tsx` | 🟠 Server Component — এখন সরাসরি DB না ছুঁয়ে `todoService.listForUser()` কল করে |
-| `app/(private)/user/todos/actions.ts` | 🟠 এখন পাতলা: `requireUserId()` → Zod parse → `todoService.xxx()` → `revalidatePath` |
-| `components/todo/Todo.tsx` | 🟠 DB থেকে seed হয়, action-গুলো এখন object নেয় (যেমন `createTodo({ title, body })`) |
-| `types/todo.ts` | 🟠 `id: number` থেকে `id: string` (Postgres uuid-এর জন্য) |
-| `app/(private)/admin/overview/page.tsx` | 🟠 Server-side role check — admin না হলে `/user/todos`-এ redirect |
-| `app/(private)/admin/users/page.tsx` | 🟠 একই guard, প্লাস `auth.api.listUsers()` দিয়ে সব user-এর টেবিল |
-| `vitest.config.ts` / `vitest.setup.ts` | 🟢 Test চালানোর configuration (jsdom environment, `@testing-library/jest-dom`, DOM cleanup) |
-| `lib/validations/todo.test.ts` | 🟢 Zod schema-র edge case test |
-| `lib/services/todo.service.test.ts` | 🟢 Service layer-এর test (Repository mock করে, আসল DB ছাড়াই) |
-| `components/todo/TodoForm.test.tsx` | 🟢 Testing Library দিয়ে form-এর আচরণ test |
+# 📚 পর্ব ১: ১০টি ধাপের পুঙ্খানুপুঙ্খ ব্যাখ্যা (Deep-Dive)
 
 ---
 
-## ৫. ধাপে ধাপে টেস্ট করো (Manual, Browser-এ)
+## ধাপ ১: Requirement (চাহিদা ও আবশ্যকতা নির্ধারণ)
 
-টার্মিনালে `npm run dev` চালিয়ে `http://localhost:3000` খোলো, তারপর নিচের ধাপগুলো একে একে করো।
+যেকোনো কোড লেখার আগে সিস্টেমের ফাংশনাল ও নন-ফাংশনাল চাহিদা স্পষ্ট থাকতে হয়।
 
-### ক) Auth টেস্ট
-
-1. **Register** — `/auth/registration`-এ গিয়ে নাম/ইমেইল/পাসওয়ার্ড দিয়ে ফর্ম জমা দাও।
-   ✅ "Registration successful!" toast দেখাবে, আর automatically `/user/todos`-এ চলে যাবে।
-
-2. **Navbar চেক** — উপরে তাকাও।
-   ✅ এখন আর "Login/Register" দেখাচ্ছে না — "Dashboard" আর "Log out" বাটন দেখাবে (কারণ `useSession()` এখন real session পেয়েছে)।
-
-3. **Log out** করে আবার **Log In** করো — একই ইমেইল/পাসওয়ার্ড দিয়ে।
-   ✅ "Logged in successfully!" এবং আবার `/user/todos`-এ redirect। Log out করলেই সাথে সাথে `/auth/login`-এ redirect হবে (refresh লাগবে না)।
-
-4. **ভুল পাসওয়ার্ড** দিয়ে Login করার চেষ্টা করো।
-   ✅ Red error toast দেখাবে ("Invalid email or password"), redirect হবে না — কোনো crash হবে না।
-
-5. **Route protection** — Log out করে সরাসরি browser URL bar-এ `localhost:3000/user/todos` টাইপ করো।
-   ✅ Todo page দেখার সুযোগই পাবে না — সাথে সাথে `/auth/login`-এ redirect হয়ে যাবে (এটা `proxy.ts`-এর কাজ)।
-
-### খ) Todo CRUD টেস্ট
-
-Login করা অবস্থায় `/user/todos` পেজে থেকে:
-
-1. একটা todo **Add** করো (title + optional details)।
-   ✅ সাথে সাথে লিস্টে দেখাবে — form খালি হয়ে যাবে। খুব ছোট (খালি) title দিয়ে submit করার চেষ্টা করলে কিছুই হবে না — Zod ও form validation দুই জায়গাতেই আটকায়।
-
-2. Checkbox-এ ক্লিক করে **Toggle Complete** করো।
-   ✅ টাইটেলের উপর দিয়ে লাইন কেটে যাবে (line-through)।
-
-3. পেন্সিল আইকনে ক্লিক করে **Edit** করো, title/body বদলে Save দাও।
-   ✅ Dialog বন্ধ হয়ে যাবে, লিস্টে নতুন title/body দেখাবে।
-
-4. সবচেয়ে গুরুত্বপূর্ণ টেস্ট — **Page reload (F5)** করো।
-   ✅ Todo হারায়নি! কারণ এখন সেটা database-এ আছে, browser memory-তে না।
-
-5. Trash আইকনে ক্লিক করে **Delete** করো, confirmation dialog-এ "Delete" চাপো।
-   ✅ লিস্ট থেকে চিরতরে চলে যাবে (reload দিলেও আর ফিরবে না)।
-
-6. **User isolation টেস্ট** — একটা Incognito window খুলে দ্বিতীয় একটা account দিয়ে Register করো, একটা আলাদা todo Add করো।
-   ✅ প্রথম account-এ ফিরে গেলে দ্বিতীয় user-এর todo দেখতে পাবে না — প্রতিটা query `userId` দিয়ে scoped বলে।
-
-### গ) Admin Authorization টেস্ট
-
-1. Normal user দিয়ে login করা অবস্থায় সরাসরি `/admin/overview` URL-এ যাও।
-   ✅ ভেতরে ঢুকতে পারবে না — `/user/todos`-এ ফেরত পাঠাবে (server-side role check)।
-
-2. নিজেকে admin বানাও — নিচের "Drizzle Studio" সেকশন দেখে `user` টেবিলে নিজের row-এর `role` কলাম `"admin"` করে দাও।
-   ✅ এখন Navbar-এ "Dashboard" লিংক `/admin/overview`-এ যাবে (আগে ছিল `/user/profile`)।
-
-3. `/admin/users`-এ যাও।
-   ✅ সব registered user-এর নাম/ইমেইল/role-এর একটা টেবিল দেখাবে।
+- **ব্যবহৃত ফাইল:**
+  - [functional-requirements.md](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/docs/requirements/functional-requirements.md) (FR-01 থেকে FR-07)
+  - [non-functional-requirements.md](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/docs/requirements/non-functional-requirements.md) (NFR-01 থেকে NFR-04)
+- **ফাইলের দায়িত্ব:** অ্যাপ্লিকেশনে ইউজার কী কী করতে পারবেন (লগইন, টুডু তৈরি, AI সাজেশন, ছবি আপলোড, PASETO শেয়ারিং) এবং সিস্টেমের গতি ও নিরাপত্তার মানদণ্ড নথিভুক্ত রাখা।
+- **ফ্লো:** এখান থেকে ঠিক হয় আমরা পরবর্তী ধাপে কোন ফিচার ডিজাইন করব।
 
 ---
 
-## ৬. Automated Test চালাও (Terminal-এ, Browser ছাড়াই)
+## ধাপ ২: Design & Architectural Decisions (ADR)
 
+- **ব্যবহৃত ফোল্ডার ও ফাইলসমূহ:**
+  - `docs/adr/` — [001-monorepo-structure.md](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/docs/adr/001-monorepo-structure.md) থেকে [005-database-and-drizzle.md](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/docs/adr/005-database-and-drizzle.md)
+  - `docs/design/` — [architecture-overview.md](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/docs/design/architecture-overview.md), [system-flow.md](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/docs/design/system-flow.md)
+- **দায়িত্ব ও নিয়ম:**
+  - **৪-লেয়ার্ড প্যাটার্ন:** UI → Server Action → Domain Service → Repository → Database।
+  - **রুট-লোকাল নিয়ম:** কোনো ফিচারের UI বা Server Action শুধু সেই রুটের ফোল্ডারে থাকবে (`_components/` ও `_lib/`), গ্লোবাল ফোল্ডার নষ্ট করা যাবে না।
+  - **জিরো-ক্র্যাশ ও ফলব্যাক নীতি:** ইন্টারনেট বা API কি না থাকলেও অ্যাপ ক্র্যাশ না করে ডামি ডেটা দিয়ে সচল থাকবে।
+
+---
+
+## ধাপ ৩: Route, Page & UI Layer (রুট ও ইউজার ইন্টারফেস)
+
+ব্যবহারকারী ব্রাউজারে যে পেজ দেখেন এবং ফর্ম পূরণ করেন।
+
+- **ব্যবহৃত ফোল্ডার ও ফাইলসমূহ:**
+  - **রুট গার্ড:** [proxy.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/proxy.ts)
+  - **সার্ভার পেজ:** [todos/page.tsx](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/app/%28dashboard%29/todos/page.tsx)
+  - **ক্লায়েন্ট কম্পোনেন্টস:**
+    - [TodoForm.tsx](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/app/%28dashboard%29/todos/_components/TodoForm.tsx) (নতুন টুডু ইনপুট ও সাবমিট ফর্ম)
+    - [TodoList.tsx](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/app/%28dashboard%29/todos/_components/TodoList.tsx) (টুডু তালিকা রেন্ডার)
+    - [TodoItem.tsx](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/app/%28dashboard%29/todos/_components/TodoItem.tsx) (একক টুডু কার্ড, কমপ্লিট চেকবক্স, ডিলিট ও শেয়ার বাটন)
+    - [TodoFilters.tsx](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/app/%28dashboard%29/todos/_components/TodoFilters.tsx) (সার্চ ও স্ট্যাটাস ফিল্টার বার)
+- **কেন এখানে রাখা হয়েছে:** Next.js App Router-এ `(dashboard)/todos` এর নিজস্ব কম্পোনেন্টগুলো `_components` ফোল্ডারে রাখলে কোড অত্যন্ত গোছানো থাকে।
+
+### গুরুত্বপূর্ণ অংশ ও কোডের ব্যাখ্যা:
+```typescript
+// apps/web/proxy.ts
+// ব্যবহারকারী লগইন ছাড়া /todos পেজে ঢোকার চেষ্টা করলে সাথে সাথে /login পেজে পাঠায়
+export function proxy(request: NextRequest) {
+  const sessionCookie = getSessionCookie(request);
+  if (!sessionCookie) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+  return NextResponse.next();
+}
+```
+
+```typescript
+// apps/web/app/(dashboard)/todos/page.tsx
+// সার্ভার কম্পোনেন্ট: সার্ভারেই ডাটাবেস থেকে প্রাথমিক টুডু লিস্ট ফেচ করে ক্লায়েন্টে পাঠায়
+const TodosPage = async ({ searchParams }: PageProps<"/todos">) => {
+  const session = await getOptionalSession();
+  const params = await searchParams;
+  const query = todoQuerySchema.parse(params);
+
+  // সার্ভিস থেকে ইউজারের নিজস্ব টুডু আনা হচ্ছে
+  const initialTodos = session
+    ? await todoService.listForUser(session.user.id, query)
+    : [];
+
+  return <Todo initialTodos={initialTodos} />;
+};
+```
+
+- **ইনপুট ও আউটপুট:**
+  - `page.tsx` ইনপুট হিসেবে URL-এর `searchParams` নেয় এবং আউটপুট হিসেবে HTML + `initialTodos` ডেটা পাঠায়।
+- **ফ্লো:** `proxy.ts` গার্ড পার হয়ে `page.tsx` লোড হয় → ইউজার UI-তে কিছু টাইপ করে সাবমিট করলে তা `TodoForm` থেকে সরাসরি সার্ভার অ্যাকশনে যায়।
+
+---
+
+## ধাপ ৪: Schema & Validation Layer (Zod ইনপুট ভ্যালিডেশন)
+
+ডাটাবেসে কোনো ভুল বা ক্ষতিকর ডেটা যেন না ঢুকতে পারে, তার একক সত্যের উৎস (Single Source of Truth)।
+
+- **ব্যবহৃত ফোল্ডার ও ফাইলসমূহ:**
+  - [schema/todo.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/schema/todo.ts) — টুডু সংক্রান্ত Zod স্কিমা
+  - [schema/auth.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/schema/auth.ts) — লগইন, রেজিস্ট্রেশন ও পাসওয়ার্ড স্কিমা
+  - [schema/ai.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/schema/ai.ts) — AI প্রম্পট স্কিমা
+  - [schema/place.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/schema/place.ts) — লোকেশন স্কিমা
+- **কেন এখানে রাখা হয়েছে:** ক্লায়েন্ট ও সার্ভার উভয় স্থানে একই স্কিমা শেয়ার করার জন্য `apps/web/schema/` ফোল্ডারে রাখা হয়েছে।
+
+### গুরুত্বপূর্ণ স্কিমাসমূহ এবং তাদের ব্যাখ্যা:
+```typescript
+// apps/web/schema/todo.ts
+
+// ১. আইডি ভ্যালিডেশন: নিশ্চিত করে এটি একটি সঠিক UUID
+export const todoIdSchema = z.string().uuid("Invalid todo id");
+
+// ২. টুডু তৈরির ইনপুট স্কিমা
+export const createTodoSchema = z.object({
+  // টাইটেল খালি থাকা চলবে না, অপ্রয়োজনীয় স্পেস ট্রিম হবে, সর্বোচ্চ ২০০ অক্ষর
+  title: z.string().trim().min(1, "Title is required").max(200, "Title is too long"),
+  // বিবরণ ঐচ্ছিক, সর্বোচ্চ ২০০০ অক্ষর; খালি স্ট্রিং থাকলে undefined বানাবে
+  body: z
+    .string()
+    .trim()
+    .max(2000, "Details are too long")
+    .optional()
+    .transform((value) => (value ? value : undefined)),
+});
+
+// ৩. সার্চ ও ফিল্টার কুয়েরি স্কিমা
+export const todoQuerySchema = z.object({
+  search: z.string().trim().max(200).optional().transform((v) => (v ? v : undefined)),
+  // স্ট্যাটাস অবশ্যই "all", "active" বা "completed" হতে হবে
+  status: z.enum(["all", "active", "completed"]).catch("all"),
+});
+```
+
+- **ইনপুট ও আউটপুট:**
+  - ইনপুট: ক্লায়েন্ট থেকে আসা যেকোনো জাভাস্ক্রিপ্ট অবজেক্ট `{ title, body }`।
+  - আউটপুট: টাইপ-সেফ ও ক্লিন ডেটা অথবা ভ্যালিডেশন এরর থ্রো করে।
+
+---
+
+## ধাপ ৫: Server Action Layer (অ্যাকশন ও অর্কেস্ট্রেশন)
+
+Next.js Server Actions হলো সার্ভারে চলা অ্যাসিনক্রোনাস ফাংশন, যা ফ্রন্টএন্ড ফর্ম থেকে সরাসরি কল করা যায়।
+
+- **ব্যবহৃত ফাইল:**
+  - [actions.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/app/%28dashboard%29/todos/_lib/actions.ts)
+  - [place.actions.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/app/%28dashboard%29/todos/_lib/place.actions.ts)
+- **দায়িত্ব:** এটি অত্যন্ত পাতলা (Thin) একটি লেয়ার। এর ৪টি নির্দিষ্ট কাজ:
+  1. `requireUserId()` দিয়ে ইউজার সেশন চেক করা।
+  2. `Zod Schema.parse()` দিয়ে ইনপুট যাচাই করা।
+  3. উপযুক্ত ডোমেন সার্ভিসকে কল করা।
+  4. `revalidatePath("/todos")` কল করে ক্যাশ রিফ্রেশ করা।
+
+### প্রধান অ্যাকশন ফাংশনসমূহের বিস্তারিত বিশ্লেষণ:
+
+#### ১. `createTodo(input)`
+```typescript
+export async function createTodo(input: { title: string; body?: string }) {
+  const userId = await requireUserId();        // ১. সেশন থেকে ইউজার আইডি বের করে
+  const data = createTodoSchema.parse(input);  // ২. Zod দিয়ে টাইটেল ও বডি ভ্যালিডেট করে
+
+  const newTodo = await todoService.create(userId, data); // ৩. সার্ভিসের মাধ্যমে তৈরি করে
+
+  revalidatePath("/todos");                   // ৪. পেজ ইনস্ট্যান্ট রিফ্রেশ করে
+  return newTodo;
+}
+```
+- **কোথা থেকে কল হয়:** `TodoForm.tsx` থেকে যখন ইউজার "Add Task" চাপেন।
+- **ইনপুট:** `{ title: "বাজার করা", body: "চাল, ডাল" }`
+- **আউটপুট:** নতুন তৈরি হওয়া `TodoType` অবজেক্ট।
+
+#### ২. `toggleTodo(id)`
+```typescript
+export async function toggleTodo(id: string) {
+  const userId = await requireUserId();
+  todoIdSchema.parse(id);                     // UUID কিনা যাচাই করে
+
+  const completed = await todoService.toggle(userId, id);
+
+  revalidatePath("/todos");
+  return completed;
+}
+```
+- **কোথা থেকে কল হয়:** `TodoItem.tsx`-এর চেকবক্সে ক্লিক করলে।
+- **ইনপুট:** `id: "c8b4..."`
+- **আউটপুট:** বুলিয়ান `true` বা `false`।
+
+#### ৩. `updateTodo(id, input)`
+```typescript
+export async function updateTodo(id: string, input: { title: string; body?: string }) {
+  const userId = await requireUserId();
+  todoIdSchema.parse(id);
+  const data = updateTodoSchema.parse(input);
+
+  const updated = await todoService.update(userId, id, data);
+  revalidatePath("/todos");
+  return updated;
+}
+```
+- **কোথা থেকে কল হয়:** `TodoItem.tsx`-এর এডিট মোডাল সাবমিট করলে।
+
+#### ৪. `deleteTodo(id)`
+```typescript
+export async function deleteTodo(id: string) {
+  const userId = await requireUserId();
+  todoIdSchema.parse(id);
+
+  await todoService.remove(userId, id);
+  revalidatePath("/todos");
+}
+```
+- **কোথা থেকে কল হয়:** `TodoItem.tsx`-এর ট্র্যাশ বিন আইকনে ক্লিক করে নিশ্চিত করলে।
+
+#### ৫. `generateSuggestions(prompt)`
+```typescript
+export async function generateSuggestions(prompt: string) {
+  await requireUserId();
+  const validPrompt = aiPromptSchema.parse(prompt);
+  return aiService.generateTodoSuggestions(validPrompt);
+}
+```
+- **কোথা থেকে কল হয়:** `TodoForm.tsx`-এর Sparkle (✨) AI বাটনে ক্লিক করলে।
+- **ইনপুট:** `"অফিস প্রেজেন্টেশন"`
+- **আউটপুট:** ৩টি সাজেস্টেড কাজের অ্যারে `[{ title, body }]`।
+
+#### ৬. `createShareLink(id)`
+```typescript
+export async function createShareLink(id: string) {
+  const userId = await requireUserId();
+  todoIdSchema.parse(id);
+
+  const token = await shareService.createShareLink(userId, id);
+  return `${getEnv().BETTER_AUTH_URL}/share/${token}`;
+}
+```
+- **কোথা থেকে কল হয়:** `TodoItem.tsx`-এর "Share" বাটনে চাপ দিলে।
+- **আউটপুট:** ক্রিপ্টোগ্রাফিক পাবলিক শেয়ার লিংক।
+
+---
+
+## ধাপ ৬: Service & Domain Layer (বিজনেস লজিক ও স্যানিটাইজেশন)
+
+- **ব্যবহৃত ফোল্ডার ও ফাইলসমূহ:**
+  - [todo.service.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/lib/services/todo.service.ts)
+  - [share.service.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/lib/services/share.service.ts)
+  - [upload.service.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/lib/services/upload.service.ts)
+  - [place.service.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/lib/services/place.service.ts)
+  - [lib/domain/todo.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/lib/domain/todo.ts)
+  - [lib/auth/session.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/lib/auth/session.ts)
+- **দায়িত্ব:** এটি অ্যাপ্লিকেশনের মূল মস্তিষ্ক। এটি সরাসরি ডাটাবেস কোয়েরি করে না; বরং রিপোজিটরিকে নির্দেশ দেয় এবং ডাটাবেস থেকে পাওয়া `null` যুক্ত কাঁচা রো-কে ফ্রন্টএন্ড-বান্ধব ডোমেন মডেলে রূপান্তর করে।
+
+### গুরুত্বপূর্ণ অংশ ও কোডের ব্যাখ্যা:
+
+#### ১. `toTodoType(row)` ট্রান্সফরমার ফাংশন
+ডাটাবেসে যেসব ফিল্ড `null` থাকে (যেমন খালি ডেসক্রিপশন বা লোকেশন), জাভাস্ক্রিপ্ট/টাইপস্ক্রিপ্টে সেগুলোকে সুন্দরভাবে `undefined` বা স্ট্রাকচার্ড অবজেক্টে রূপান্তর করে:
+```typescript
+// apps/web/lib/services/todo.service.ts
+function toTodoType(row: RawTodoRow): TodoType {
+  return {
+    id: row.id,
+    title: row.title,
+    body: row.body ?? undefined,
+    imageUrl: row.imageUrl ?? undefined,
+    place:
+      row.placeId && row.placeName && row.placeLat != null && row.placeLng != null
+        ? { id: row.placeId, name: row.placeName, lat: row.placeLat, lng: row.placeLng }
+        : undefined,
+    completed: row.completed,
+  };
+}
+```
+
+#### ২. সেশন সিকিউরিটি হেল্পার্স (`lib/auth/session.ts`)
+```typescript
+// ইউজারের সেশন চেক করে; লগইন না থাকলে সরাসরি Error থ্রো করে
+export async function requireSession() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) throw new Error("Not authenticated");
+  return session;
+}
+
+// সহজে শুধুমাত্র লগইন করা ইউজারের ID পাওয়ার জন্য
+export async function requireUserId() {
+  const session = await requireSession();
+  return session.user.id;
+}
+
+// অ্যাডমিন কিনা চেক করার জন্য
+export async function isAdmin(): Promise<boolean> {
+  const session = await getOptionalSession();
+  return session?.user.role === "admin";
+}
+```
+
+---
+
+## ধাপ ৭: Repository Layer (ডাটাবেস এক্সেস লেয়ার)
+
+- **ব্যবহৃত ফাইল:** [todo.repository.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/drizzle/todo.repository.ts)
+- **কঠোর নিয়ম:** পুরো অ্যাপ্লিকেশনে **শুধুমাত্র এই ফাইলটি** Drizzle ORM-এর `db` ক্লায়েন্ট ইমপোর্ট করতে পারে। কোনো UI বা সার্ভিস সরাসরি `db` ছুঁতে পারবে না।
+- **দায়িত্ব:** ডাটাবেসে SQL কুয়েরি চালানো এবং প্রতিটা কুয়েরিতে `userId` বাধ্যবাধকতা বজায় রাখা।
+
+### রিপোজিটরির কুয়েরিসমূহ ও ব্যাখ্যা:
+```typescript
+// apps/web/drizzle/todo.repository.ts
+export const todoRepository = {
+  // ১. ইউজারের টুডু খোঁজা (সার্চ ও ফিল্টার সহ)
+  async findByUserId(userId: string, query?: TodoQuery) {
+    const conditions = [eq(todos.userId, userId)]; // 👈 মাল্টি-টেন্যান্ট আইসোলেশন
+
+    if (query?.search) {
+      const pattern = `%${query.search}%`;
+      conditions.push(or(ilike(todos.title, pattern), ilike(todos.body, pattern))!);
+    }
+    if (query?.status === "active") conditions.push(eq(todos.completed, false));
+    if (query?.status === "completed") conditions.push(eq(todos.completed, true));
+
+    return db.select().from(todos).where(and(...conditions)).orderBy(desc(todos.createdAt));
+  },
+
+  // ২. নতুন টুডু ইনসার্ট করা
+  async insert(userId: string, data: { title: string; body?: string }) {
+    const [row] = await db
+      .insert(todos)
+      .values({ userId, title: data.title, body: data.body ?? null })
+      .returning();
+    return row;
+  },
+
+  // ৩. টুডুর কমপ্লিট স্ট্যাটাস টগল করা (SQL NOT অপারেশন)
+  async toggle(id: string, userId: string) {
+    const [row] = await db
+      .update(todos)
+      .set({ completed: sql`not ${todos.completed}`, updatedAt: new Date() })
+      .where(and(eq(todos.id, id), eq(todos.userId, userId))) // 👈 অন্য ইউজারের টুডু টগল করা অসম্ভব
+      .returning();
+    return row;
+  },
+
+  // ৪. টুডু ডিলিট করা
+  async remove(id: string, userId: string) {
+    await db.delete(todos).where(and(eq(todos.id, id), eq(todos.userId, userId)));
+  },
+};
+```
+
+---
+
+## ধাপ ৮: Database Layer (Postgres + Drizzle Schema)
+
+- **ব্যবহৃত ফাইলসমূহ:**
+  - [drizzle/schema.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/drizzle/schema.ts) — টুডু টেবিল স্কিমা
+  - [drizzle/auth-schema.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/drizzle/auth-schema.ts) — অথেনটিকেশন টেবিল (`user`, `session`, `account`, `verification`)
+  - [drizzle/client.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/drizzle/client.ts) — Neon Postgres ডাটাবেস সংযোগকারী
+  - [drizzle.config.ts](file:///c:/Users/Tplus_staff/Desktop/Todo-App/todo-project/apps/web/drizzle.config.ts) — Drizzle Kit কনফিগারেশন
+
+### টেবিল স্কিমা কাঠামো:
+```typescript
+// apps/web/drizzle/schema.ts
+export const todos = pgTable("todos", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),            // 👈 Foreign Key to User
+  title: varchar("title", { length: 200 }).notNull(),
+  body: text("body"),
+  imageUrl: text("image_url"),
+  placeId: text("place_id"),
+  placeName: text("place_name"),
+  placeLat: doublePrecision("place_lat"),
+  placeLng: doublePrecision("place_lng"),
+  completed: boolean("completed").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+```
+
+---
+
+## ধাপ ৯: Automated Testing (স্বয়ংক্রিয় টেস্টিং)
+
+আমাদের প্রজেক্টে আসল ডাটাবেস চালু না রেখেও কয়েক মিলি-সেকেন্ডে পুরো সিস্টেমের লজিক টেস্ট করা যায়।
+
+- **টেস্ট ফাইল লোকেশন:** `apps/web/tests/`
+  - `todo.schema.test.ts` — Zod ভ্যালিডেশনের টেস্ট (খালি টাইটেল, অতিরিক্ত বড় টেক্সট আটকায় কিনা)।
+  - `todo.service.test.ts` — সার্ভিস লেয়ারের টেস্ট (রিপোজিটরি মক করে সার্ভিস ঠিকমতো কাজ করছে কিনা)।
+  - `TodoForm.test.tsx` — রিঅ্যাক্ট টেস্টিং লাইব্রেরি দিয়ে ফর্ম সাবমিশন টেস্ট।
+  - `paseto.test.ts` — টোকেন এনক্রিপশন ও ডিক্রিপশন টেস্ট।
+
+### টেস্ট চালানোর কমান্ড:
 ```bash
-npm run test          # একবার চালিয়ে ফলাফল দেখায়
-npm run test:watch    # ফাইল বদলালেই আবার চলে (লেখার সময় ব্যবহার করো)
+cd apps/web
+npm run test          # একবার টেস্ট চালিয়ে রিপোর্ট দেখতে
+npm run test:watch    # কোড লেখার সাথে সাথে লাইভ টেস্ট চালাতে
 ```
 
-**এখন যা test হচ্ছে (১৩টা test, ৩টা file):**
+---
 
-| Test file | কী check করে |
-|---|---|
-| `lib/validations/todo.test.ts` | খালি title reject হয়, ২০০ char-এর বেশি title reject হয়, whitespace ঠিকমতো trim হয়, `todoIdSchema` ভুল uuid reject করে |
-| `lib/services/todo.service.test.ts` | Service সঠিকভাবে Repository কল করছে কিনা, DB-র `null` body → UI-র `undefined`-এ রূপান্তর ঠিকমতো হচ্ছে কিনা — **আসল database ছাড়াই**, Repository mock করে |
-| `components/todo/TodoForm.test.tsx` | Form-এ টাইপ করে Add চাপলে সঠিক (trimmed) data দিয়ে callback call হয় কিনা, খালি title-এ submit আটকায় কিনা |
+## ধাপ ১০: Review & Observability (পর্যালোচনা)
 
-**কেন গুরুত্বপূর্ণ:** এই test গুলো লিখতে গিয়েই ২টা real bug ধরা পড়েছিল — একটা test fixture-এ ভুল uuid ব্যবহার হয়েছিল (Zod সঠিকভাবেই ধরেছে), আর Testing Library-র automatic cleanup ঠিকমতো wire করা ছিল না (একই test file-এর ভেতরের test একে অপরের সাথে মিশে যাচ্ছিল)। এটাই automated test-এর আসল সুবিধা — চোখে না পড়া bug সামনে নিয়ে আসে।
+কোড পিআর (Pull Request) বা প্রোডাকশনে পাঠানোর আগে চেকলিস্ট:
+1. ✅ **টাইপ সেফটি:** কোনো ফাইলে `any` টাইপ আছে কি না? (`npm run check-types`)
+2. ✅ **ইউজার আইসোলেশন:** প্রতিটি নতুন রিপোজিটরি মেথডে `userId` বাধ্যতামূলক আছে কি না?
+3. ✅ **ফলব্যাক সুরক্ষা:** এক্সটার্নাল এপিআই বন্ধ থাকলে অ্যাপ ক্র্যাশ না করে বিকল্প ডেটা দিচ্ছে কি না?
+4. ✅ **টেস্ট স্ট্যাটাস:** সব কয়টি Vitest টেস্ট গ্রিন (Pass) হয়েছে কি না?
 
 ---
 
-## ৭. বোনাস: Drizzle Studio দিয়ে DB সরাসরি দেখো
+## ধাপ ১১: স্কেল-উপযোগী গঠন — Over-Engineering এড়িয়ে চলা
 
-```bash
-npm run db:studio
+এই প্রজেক্টের স্কেলে (একটাই app, ছোট টিম) ফোল্ডার স্ট্রাকচার **flat** রাখাই ডিফল্ট নিয়ম। একটা মাত্র ফাইলের জন্য subfolder তৈরি করা, বা কোনো real caller ছাড়া নতুন layer/wrapper বানানো — দুটোই over-engineering, এবং দুটোই এড়িয়ে চলতে হবে।
+
+**নিয়মগুলো:**
+1. **`schema/`, `tests/`, `drizzle/` সবসময় flat।** এক ফাইলের জন্য আলাদা subfolder (যেমন `drizzle/repositories/todo.repository.ts` বা `drizzle/schema/todo.schema.ts`) বানানো হয় না — সরাসরি `drizzle/todo.repository.ts`, `drizzle/schema.ts`।
+2. **`lib/paseto.ts` এর মতো ছোট shared ইউটিলিটি `lib/` রুটেই থাকে** — নিজস্ব subfolder পায় না যতক্ষণ না একাধিক related ফাইল জমা হয়।
+3. **Real consumer ছাড়া কোনো abstraction/layer/service রাখা হয় না।** উদাহরণ: এই প্রজেক্টে আগে একটা `notification` ফিচার (service + domain type + schema + test) তৈরি হয়েছিল, কিন্তু কোনো UI/route/action সেটা call করত না — তাই পুরোপুরি সরিয়ে ফেলা হয়েছে। কোনো future use-case অনুমান করে আগে থেকে কোড লেখা হয় না; দরকার হলে তখনই যোগ হবে।
+4. **`packages/ui`, `packages/types`, `packages/utils`, `packages/config`, `packages/validation` — সব খালি প্লেসহোল্ডার।** এই মনোরেপোতে এখনো একটাই app (`apps/web`) আছে, তাই শেয়ার করার মতো দ্বিতীয় কোনো consumer নেই। যেদিন সত্যিকারের দ্বিতীয় app আসবে, সেদিন কমন কোড এখানে সরানো হবে — আগে থেকে নয়।
+
+**কেন এই নিয়ম?** কম ফাইলের জন্য বেশি ফোল্ডার/লেয়ার থাকলে নতুন ডেভেলপারের জন্য কোড খুঁজে পাওয়া কঠিন হয়ে যায়, এবং duplicate/conflicting versions তৈরির ঝুঁকি বাড়ে (এই প্রজেক্টেই একবার flat আর nested — দুই ধরনের `drizzle/` স্ট্রাকচার একসাথে থেকে গিয়েছিল, পরে flat-এ ফিরিয়ে আনতে হয়েছে)। Structure সবসময় project-এর **বর্তমান scale** অনুযায়ী হওয়া উচিত, কাল্পনিক ভবিষ্যতের জন্য নয়।
+
+---
+
+# 🚀 পর্ব ২: নতুন ফিচার যোগ করার স্টেপ-বাই-স্টেপ কুকবুক (Cookbook)
+
+> **দৃশ্যপট:** ধরা যাক, ভবিষ্যতে আপনি টুডুতে **"Priority (Low / Medium / High)"** ফিচার যোগ করতে চান। কীভাবে কাজ করবেন?
+
+নিচের ধারাবাহিক চেকলিস্ট অনুসরণ করুন:
+
+```
+[ধাপ ১: Schema & DB] ──► [ধাপ ২: Zod Validation] ──► [ধাপ ৩: Repository] 
+                                                             │
+┌────────────────────────────────────────────────────────────┘
+▼
+[ধাপ ৪: Service & Domain] ──► [ধাপ ৫: Server Action] ──► [ধাপ ৬: UI Component] ──► [ধাপ ৭: Test]
 ```
 
-এটা browser-এ একটা visual database explorer খুলে দেবে (`local.drizzle.studio`)। বাম পাশে `user`, `session`, `todos` টেবিল দেখবে — যা কিছু test করছ, সেটা এখানে live change হতে দেখতে পাবে। এখান থেকেই কোনো user-এর `role` সেল-এ ক্লিক করে `"admin"` লিখে বদলে দিতে পারবে।
+### ১. কোন ফাইল পরিবর্তন বা তৈরি করবেন?
+
+| ধাপ | লেয়ার | ফাইল লোকেশন | কী কোড লিখতে হবে |
+|---|---|---|---|
+| **১** | **Database** | `apps/web/drizzle/schema.ts` | `todos` টেবিলে `priority: varchar("priority", { length: 20 }).default("medium")` যোগ করুন। তারপর টার্মিনালে `npx drizzle-kit generate` চালান। |
+| **২** | **Validation** | `apps/web/schema/todo.ts` | `createTodoSchema`-তে `priority: z.enum(["low", "medium", "high"]).default("medium")` যোগ করুন। |
+| **৩** | **Domain Model** | `apps/web/lib/domain/todo.ts` | `TodoType` ইন্টারফেসে `priority: "low" \| "medium" \| "high"` যোগ করুন। |
+| **৪** | **Repository** | `apps/web/drizzle/todo.repository.ts` | `insert` ও `update` কুয়েরিতে `priority` কলাম যুক্ত করুন। |
+| **৫** | **Service** | `apps/web/lib/services/todo.service.ts` | `toTodoType()` ফাংশনে `priority: row.priority` ম্যাপিং যোগ করুন। |
+| **৬** | **Server Action** | `apps/web/app/(dashboard)/todos/_lib/actions.ts` | কোনো পরিবর্তন ছাড়াই স্বয়ংক্রিয়ভাবে টাইপ পাস হয়ে যাবে। |
+| **৭** | **UI Form & Item** | `apps/web/app/(dashboard)/todos/_components/` | `TodoForm.tsx`-এ প্রায়োরিটি ড্রপডাউন এবং `TodoItem.tsx`-এ কালার ব্যাজ (Badge) দেখান। |
+| **৮** | **Test** | `apps/web/tests/todo.schema.test.ts` | অবৈধ প্রায়োরিটি দিলে Zod এরর দেয় কিনা টেস্ট লিখুন। |
 
 ---
 
-## ৮. টেস্ট করতে গিয়ে আটকালে
+# 🛠️ পর্ব ৩: কমন সমস্যা ও সমাধান (Troubleshooting FAQ)
 
-**Login/Register করলে কিছুই হচ্ছে না, console-এ error**
-`.env.local` চেক করো — `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `PASETO_LOCAL_KEY` থাকতে হবে। dev server restart করে দেখো (env বদলালে restart লাগে)।
+### ১. Login/Register কাজ করছে না, Console-এ এরর?
+- **কারণ:** `.env.local` ফাইলে `DATABASE_URL` বা `BETTER_AUTH_SECRET` মিসিং অথবা সার্ভার রিস্টার্ট করা হয়নি।
+- **সমাধান:** `.env.local` চেক করুন এবং `npm run dev` রিস্টার্ট দিন।
 
-**Todo add করলে toast-এ "Could not add todo" দেখাচ্ছে**
-Session expire হয়ে থাকতে পারে — একবার Log out করে আবার Log in করো। এখনো সমস্যা হলে terminal-এ dev server-এর log দেখো, actual database error সেখানে দেখাবে।
+### ২. টুডু যোগ করার পর পেজ নিজে থেকে আপডেট হচ্ছে না?
+- **কারণ:** Server Action-এ `revalidatePath("/todos")` কল করা হয়নি।
+- **সমাধান:** `actions.ts`-এ ফাংশনের শেষে `revalidatePath("/todos")` নিশ্চিত করুন।
 
-**Admin page-এ ঢুকতে পারছি না, role admin করার পরেও**
-Drizzle Studio-তে সঠিক row বদলেছ কিনা check করো (ইমেইল মিলিয়ে দেখো)। তারপর একবার Log out → Log in করো, কারণ session-এর সাথে role তথ্য জড়ানো থাকে।
+### ৩. অন্য ইউজারের টুডু দেখা যাচ্ছে?
+- **কারণ:** রিপোজিটরিতে `eq(todos.userId, userId)` ফিল্টার মিস হয়েছে।
+- **সমাধান:** `drizzle/todo.repository.ts`-এর প্রতিটি মেথডে `userId` নিশ্চিত করুন।
 
-**`npm run db:migrate` করলে "url: undefined" error**
-`drizzle.config.ts`-এ env load ঠিকমতো `.env.local` থেকে হচ্ছে কিনা দেখো।
-
-**`npm run test` চালালে "Cannot find module '@/...'" error**
-`vitest.config.ts`-এ `@` alias ঠিকমতো `resolve.alias`-এ সেট আছে কিনা দেখো — এটা `tsconfig.json`-এর path alias-এর থেকে আলাদাভাবে configure করতে হয় (Vitest, TypeScript-এর tsconfig automatically পড়ে না)।
-
-**`npm run test` চালালে একই test file-এর ভেতরের test একে অপরের সাথে মিশে যাচ্ছে**
-`vitest.setup.ts`-এ `afterEach(() => cleanup())` আছে কিনা check করো — এটা ছাড়া প্রতিটা `render()`-এর DOM আগেরটার সাথে জমা হতে থাকে।
+### ৪. ডাটাবেস সরাসরি ব্রাউজারে দেখতে চান?
+- টার্মিনালে চালান:
+  ```bash
+  cd apps/web
+  npm run db:studio
+  ```
+- এটি ব্রাউজারে Drizzle Studio ওপেন করবে যেখানে আপনি সরাসরি `todos`, `user`, `session` টেবিলের ডেটা দেখতে ও এডিট করতে পারবেন।
 
 ---
-
-*তোমার নিজের শেখার progress track করার জন্য বানানো — যেকোনো ধাপে আটকালে জিজ্ঞেস করো।*
+*এই প্লেবুকটি আপনার কোডবেসের প্রতিটি নতুন ফিচারের সাথে তাল মিলিয়ে আপডেট রাখার জন্য প্রস্তুত করা হয়েছে।*

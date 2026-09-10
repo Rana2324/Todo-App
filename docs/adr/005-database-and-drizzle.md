@@ -1,22 +1,49 @@
-# ADR 005: Database Schema & Drizzle ORM Repository Pattern
+# ADR 005: ডাটাবেস স্কিমা ও Drizzle ORM রিপোজিটরি প্যাটার্ন (Database Schema & Drizzle ORM)
 
-## Status
-Accepted
+> **ORM ও রিপোজিটরি প্যাটার্ন কী?**  
+> - **ORM (Object-Relational Mapping):** প্রোগ্রামিং ল্যাঙ্গুয়েজ (TypeScript) দিয়ে ডাটাবেসের টেবিল ও কুয়েরি নিয়ন্ত্রণ করার সহজ উপায়।
+> - **রিপোজিটরি (Repository):** ডাটাবেসের সমস্ত কুয়েরি এক জায়গায় রাখা, যেন অ্যাপের অন্য কোনো অংশকে জানতে না হয় ডাটাবেস কোথায় বা কীভাবে ডাটা সেভ হচ্ছে।
 
-## Context
-TypeScript applications need end-to-end type safety between the database schema and runtime application code, as well as deterministic, version-controlled database migrations.
+## স্ট্যাটাস (Status)
+**গৃহীত (Accepted)** ✅
 
-## Decision
-1. **Drizzle ORM + Neon Postgres**:
-   - Drizzle ORM provides zero-overhead, type-safe SQL query generation with TypeScript schema definitions.
-   - Schemas are partitioned into `apps/web/drizzle/schema.ts` (application entities like `todos`) and `apps/web/drizzle/auth-schema.ts` (Better Auth entities like `user`, `session`, `account`, `verification`).
-2. **Migrations Directory**:
-   - `apps/web/drizzle/migrations/` stores versioned SQL migration scripts generated via `drizzle-kit generate`.
-3. **Repository Pattern**:
-   - `apps/web/drizzle/todo.repository.ts` encapsulates all query execution.
-   - All mutations and lookups are parameterized and explicitly filtered by `userId`.
+---
 
-## Consequences
-- **Type Safety**: Database columns automatically infer TypeScript types without code duplication.
-- **Auditable Evolution**: Database schema changes are tracked in source control via SQL migration files.
-- **Scoped Security**: Queries cannot accidentally leak cross-tenant data.
+## প্রেক্ষাপট ও প্রয়োজনীয়তা (Context & Requirement)
+আধুনিক TypeScript ওয়েব অ্যাপ্লিকেশনে ডাটাবেসের টেবিলের সাথে কোডের টাইপ সেফটি (Type Safety) নিশ্চিত করা অত্যন্ত জরুরি। ডাটাবেসের কোনো কলামের নাম বা ধরন বদলালে তা যেন কোডে লাল দাগ (টাইপ এরর) দিয়ে সাথে সাথে সতর্ক করে দেয়।
+
+---
+
+## গৃহীত সিদ্ধান্ত (Our Decision)
+
+### ১. Drizzle ORM + Neon PostgreSQL:
+- **Drizzle ORM:** এটি অত্যন্ত দ্রুতগতির এবং লাইটওয়েট একটি ORM। এটি শতভাগ টাইপ-সেফ SQL কুয়েরি তৈরি করতে সাহায্য করে।
+- **স্কিমা বিভাজন:**
+  - `apps/web/drizzle/schema.ts` — অ্যাপ্লিকেশনের মূল এনটিটি (যেমন: `todos` টেবিল)।
+  - `apps/web/drizzle/auth-schema.ts` — Better Auth সংক্রান্ত টেবিল (যেমন: `user`, `session`, `account`, `verification`)।
+
+### ২. মাইগ্রেশন ব্যবস্থাপনা (`drizzle/migrations/`):
+- ডাটাবেসের টেবিলে কোনো পরিবর্তন আনলে তা `drizzle-kit generate` কমান্ড দিয়ে স্বয়ংক্রিয়ভাবে ভার্সনড SQL ফাইলে সেভ হয়। ফলে ডাটাবেসের প্রতিটি পরিবর্তনের পূর্ণ হিস্ট্রি গিট (Git)-এ সংরক্ষিত থাকে।
+
+### ৩. রিপোজিটরি প্যাটার্ন (`drizzle/todo.repository.ts`):
+- ডাটাবেসের সাথে যেকোনো ধরনের ইনসার্ট, সিলেক্ট, আপডেট বা ডিলিট কাজ একমাত্র রিপোজিটরি ফাইলেই সম্পন্ন হয়।
+- প্রতিটি কুয়েরিতে বাধ্যতামূলকভাবে ব্যবহারকারীর `userId` ফিল্টার হিসেবে যুক্ত থাকে:
+
+```typescript
+// উদাহরণ: রিপোজিটরিতে ইউজারের ডাটা সম্পূর্ণ আইসোলেটেড রাখা হয়
+export async function findTodosByUser(userId: string) {
+  return await db
+    .select()
+    .from(todos)
+    .where(eq(todos.userId, userId)) // শুধুমাত্র এই ইউজারের টুডু আনা হবে
+    .orderBy(desc(todos.createdAt));
+}
+```
+
+---
+
+## ফলাফল ও সুবিধা (Consequences & Benefits)
+
+- 🔒 **সম্পূর্ণ টাইপ সেফটি:** ডাটাবেসের কলামের ধরন ভুল হওয়ার বা রানটাইম ক্র্যাশ করার কোনো সুযোগ নেই।
+- 🛡️ **মাল্টি-টেন্যান্ট ডেটা নিরাপত্তা:** কুয়েরি লেভেলেই `userId` বাধ্যবাধকতার কারণে একজন ব্যবহারকারীর তথ্য ভুলেও অন্য ব্যবহারকারীর কাছে যাবে না।
+- 📜 **ভার্সন নিয়ন্ত্রিত ডাটাবেস:** মাইগ্রেশন ফাইলের মাধ্যমে টিমের সবাই একই ডাটাবেস কাঠামো বজায় রাখতে পারেন।

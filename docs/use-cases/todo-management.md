@@ -1,22 +1,39 @@
-# Use Case: Todo Item Lifecycle Management
+# ইউজ কেস: টুডু লাইফসাইকেল ও AI অ্যাসিস্ট্যান্স (Todo Lifecycle & AI Planning)
 
-## Primary Actor
-Authenticated User
+---
 
-## Pre-conditions
-- User has logged in and has an active session.
+## 👤 প্রধান চরিত্র বা অ্যাক্টর (Primary Actor)
+লগইন করা ব্যবহারকারী (Authenticated User)
 
-## Main Success Scenario
-1. User navigates to `/todos`.
-2. Server Component fetches user-scoped todos via `todoService.listForUser(userId)` and renders the initial list.
-3. User enters a task title in `TodoForm` and clicks "Add".
-4. Server Action `createTodoAction` receives data, verifies caller session, parses input via `createTodoSchema`, and delegates to `todoService.create`.
-5. Repository executes parameterized insert into Postgres and returns the row.
-6. Server Action invokes `revalidatePath("/todos")`, updating the UI instantly with the new item.
-7. User can toggle completion status (line-through strike), click edit dialog to modify text, or delete item via confirmation alert.
+---
 
-## Extension: AI-Assisted Planning
-1. User clicks the AI suggestions sparkle button and inputs a goal prompt (e.g. "Prepare product launch").
-2. Server Action calls `aiService.generateTodoSuggestions(prompt)`.
-3. System prompts OpenAI `gpt-4o-mini` (or falls back to mock suggestions) and validates returned JSON schema.
-4. Suggestions render as quick-add cards; clicking an item automatically saves it to the user's Todo list.
+## 📋 পূর্বশর্ত (Pre-conditions)
+- ব্যবহারকারী সঠিকভাবে সিস্টেমে লগইন করেছেন এবং তার সেশন কার্যকর আছে।
+
+---
+
+## 🚀 মূল সফল দৃশ্যপট (Main Success Scenario)
+
+### ১. টুডু তালিকা দর্শন (List View):
+- ব্যবহারকারী `/todos` ড্যাশবোর্ডে প্রবেশ করলে সার্ভার কম্পোনেন্ট `todoService.listForUser(userId)` কল করে ডাটাবেস থেকে শুধু ওই ইউজারের কাজগুলো এনে তালিকা প্রদর্শন করে।
+
+### ২. নতুন টুডু তৈরি (Creation):
+- ব্যবহারকারী `TodoForm`-এ কাজের শিরোনাম (Title) এবং বিস্তারিত লিখে "Add Task" বাটনে ক্লিক করেন।
+- সার্ভার অ্যাকশন `createTodoAction` সেশন ভ্যালিডেট করে এবং Zod স্কিমা দিয়ে ইনপুট চেক করে ডাটাবেসে নতুন রো ইনসার্ট করে।
+- `revalidatePath("/todos")` পেজকে স্বয়ংক্রিয়ভাবে রিফ্রেশ করে নতুন কাজটি তালিকায় যুক্ত করে দেয়।
+
+### ৩. স্ট্যাটাস পরিবর্তন ও এডিট (Toggle & Edit):
+- চেকবক্সে ক্লিক করলে কাজটি সাথে সাথে সম্পন্ন (Completed / Line-through) বা অসম্পন্ন (Pending) হিসেবে টগল হয়।
+- এডিট আইকনে ক্লিক করে পপ-আপ মোডাল থেকে কাজের শিরোনাম বা বিবরণ সহজেই সংশোধন করা যায়।
+
+### ৪. মুছে ফেলা (Deletion):
+- ডিলিট আইকনে ক্লিক করলে একটি নিশ্চিতকরণ ডায়ালগ আসে এবং অনুমোদন দিলে ডাটাবেস থেকে টুডুটি সম্পূর্ণ মুছে যায়।
+
+---
+
+## 🤖 অতিরিক্ত ফিচার: AI-ভিত্তিক টাস্ক প্ল্যানিং (AI Suggestions)
+
+1. **AI বাটনে ক্লিক:** ব্যবহারকারী ইনপুট ফর্মের পাশে থাকা স্পার্কল (Sparkle ✨) বাটনে ক্লিক করেন।
+2. **প্রম্পট ইনপুট:** ব্যবহারকারী তার কাঙ্ক্ষিত লক্ষ্যের বিবরণ লেখেন (যেমন: "অফিসের প্রেজেন্টেশন প্রস্তুত করা")।
+3. **AI সাজেশন জেনারেশন:** সার্ভার অ্যাকশন `aiService.generateTodoSuggestions(prompt)` কল করে যা OpenAI `gpt-4o-mini` থেকে ৩টি যৌক্তিক ও ছোট ছোট কাজের তালিকা তৈরি করে আনে।
+4. **সহজ এডপশন:** স্ক্রিনে সুন্দর সাজেশন কার্ড প্রদর্শিত হয়। ব্যবহারকারী যেকোনো সাজেশনের উপর ক্লিক করলেই তা স্বয়ংক্রিয়ভাবে টাইটেল ও ডেসক্রিপশন পূরণ করে তার টুডু লিস্টে সেভ করে ফেলে।

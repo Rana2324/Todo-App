@@ -1,25 +1,51 @@
-# ADR 004: Isolation of External API Providers
+# ADR 004: এক্সটার্নাল API প্রোভাইডার আইসোলেশন ও ফলব্যাক ব্যবস্থা (Isolation of External API Providers)
 
-## Status
-Accepted
+> **প্রোভাইডার আইসোলেশন ও ফলব্যাক কী?**  
+> - **প্রোভাইডার আইসোলেশন (Provider Isolation):** বাইরের কোনো সেবা বা থার্ড-পার্টি API (যেমন: OpenAI, AWS S3, Google Maps) এর কোড মূল অ্যাপ্লিকেশনের লজিক থেকে আলাদা একটি ফোল্ডারে গুছিয়ে রাখা।
+> - **ফলব্যাক (Graceful Fallback):** যদি কোনো কারণে ইন্টারনেট চলে যায়, বিল শেষ হয়ে যায় বা এপিআই কি (API Key) না থাকে, তবুও যেন অ্যাপ ক্র্যাশ না করে ডামি/মক ডাটা দিয়ে ঠিকমতো চালু থাকে।
 
-## Context
-Enterprise applications frequently integrate with 3rd-party SaaS platforms (OpenAI, AWS S3, Google Business Profile, Instagram/Meta Graph, Geoapify). Direct vendor SDK calls scattered across UI or business logic create high coupling, make testing difficult, and break local development when vendor API keys are missing.
+## স্ট্যাটাস (Status)
+**গৃহীত (Accepted)** ✅
 
-## Decision
-We enforce strict isolation for all external third-party SDKs under `apps/web/lib/providers/`:
-1. **Provider Isolation**:
-   - `openai.ts`: OpenAI client instantiation.
-   - `s3.ts`: AWS S3 client wrapper.
-   - `geoapify.ts`: Geoapify location search REST client.
-   - `google-business.ts`: Google Business Profile REST client.
-   - `instagram.ts`: Meta Graph Instagram Media REST client.
-2. **Service Fallbacks & Graceful Degradation**:
-   - Business services (`lib/services/` and `lib/ai/`) wrap provider calls with configuration checks (`lib/env.ts`).
-   - If an API key is missing or an external API is temporarily down, services gracefully fall back to deterministic mock data without crashing the UI.
-   - Media uploads use Sharp for image optimization and fall back to local disk storage (`public/uploads/`) during local development when S3 credentials are unset.
+---
 
-## Consequences
-- **Zero-Friction Onboarding**: New developers can run and test the entire project locally without needing 5 paid external vendor API accounts.
-- **Resilience**: Network failures in external APIs do not bring down core application functionality.
-- **Provider Swappability**: Replacing an external provider (e.g. switching from Geoapify to Foursquare or Google Maps) only touches a single file under `lib/providers/`.
+## প্রেক্ষাপট ও চ্যালেঞ্জ (Context & Challenge)
+আধুনিক প্রজেক্টে নানা ধরনের ৩য়-পক্ষীয় SaaS সেবা (OpenAI, AWS, Geoapify, Meta) ব্যবহার করা হয়। 
+সাধারণত ডেভেলপাররা সরাসরি কম্পোনেন্টের মধ্যে বা সার্ভিসের মাঝে এসব SDK কল লিখে ফেলেন। 
+
+### এতে কী কী সমস্যা তৈরি হয়?
+1. **নতুন ডেভেলপারের জন্য জটিলতা:** প্রজেক্ট রান করতে গিয়েই ৫টি পেইড সার্ভিসের API Key সেট করতে হয়, না হলে অ্যাপ ক্র্যাশ করে।
+2. **সার্ভার ডাউন হলে অ্যাপ বন্ধ:** কোনো থার্ড-পার্টি সার্ভিস ডাউন থাকলে পুরো অ্যাপ্লিকেশন অচল হয়ে পড়ে।
+3. **প্রোভাইডার পরিবর্তন কঠিন:** ভবিষ্যতে OpenAI থেকে অন্য AI বা AWS থেকে Google Cloud-এ যেতে হলে পুরো প্রজেক্টের বহু ফাইল এডিট করতে হয়।
+
+---
+
+## গৃহীত সিদ্ধান্ত (Our Decision)
+আমরা সব এক্সটার্নাল সার্ভিসকে `apps/web/lib/providers/` ফোল্ডারের অধীনে কঠোরভাবে আইসোলেট (আলাদা) করেছি:
+
+| প্রোভাইডার ফাইল | আসল সেবা | কাজ | API Key না থাকলে ফলব্যাক (Fallback) |
+|---|---|---|---|
+| `openai.ts` | OpenAI (`gpt-4o-mini`) | AI দিয়ে টুডু কাজের আইডিয়া তৈরি | পূর্বনির্ধারিত সুন্দর মক টাস্ক সাজেশন রিটার্ন করে |
+| `s3.ts` | AWS S3 + Sharp | ছবি আপলোড ও কম্প্রেশন | লোকাল ফাইলসিস্টেমে (`public/uploads/`) সংরক্ষণ করে |
+| `geoapify.ts` | Geoapify Places API | লোকেশন বা রেস্তোরাঁ সার্চ | ডামি লোকেশন ও ক্যাফে তালিকা ফিল্টার করে |
+| `google-business.ts` | Google Business API | লোকেশনের রেটিং ও খোলার সময় | রেটিং ও রিভিউয়ের সুন্দর মক ডাটা প্রদর্শন করে |
+| `instagram.ts` | Meta Graph API | স্থানের সাম্প্রতিক সোশ্যাল পোস্ট | ডামি ইনস্টাগ্রাম পোস্টের গ্রিড রিটার্ন করে |
+
+---
+
+## প্রোভাইডারদের জন্য প্রধান ডিজাইন রুলস (Design Rules)
+
+1. **কনফিগারেশন যাচাই (`lib/env.ts`):**  
+   যেকোনো এক্সটার্নাল রিকোয়েস্ট পাঠানোর আগে `isOpenAiConfigured()` বা `isS3Configured()` ফাংশন দিয়ে চেক করা হয় এনভায়রনমেন্ট ভেরিয়েবল সেট আছে কিনা।
+2. **জিরো-ক্র্যাশ গ্যারান্টি (Zero Throw Contract):**  
+   থার্ড-পার্টি API ফেইল করলে বা টাইমআউট হলেও সার্ভিস কখনোই এরর থ্রো করে UI ভেঙে ফেলে না; বরং একটি সতর্কতা লগ করে ব্যাকআপ (মক) ডেটা ফেরত পাঠায়।
+3. **পরিচ্ছন্ন ডোমেইন মডেল (Strict Domain Typing):**  
+   বাইরের সার্ভিসের জটিল ও অবিন্যস্ত ডেটা সরাসরি UI-তে আসে না। সার্ভিস লেয়ার সেগুলোকে আমাদের নিজস্ব টাইপ ফরম্যাটে রূপান্তর করে নেয়।
+
+---
+
+## ফলাফল ও সুবিধা (Consequences & Benefits)
+
+- 🚀 **জিরো-কনফিগারেশন অনবোর্ডিং:** একজন নতুন শিক্ষার্থী বা ডেভেলপার কোনো পেইড API Key ছাড়াই প্রজেক্ট ক্লোন করে নিমেষেই সম্পূর্ণ অ্যাপ রান ও টেস্ট করতে পারেন।
+- 🛡️ **উচ্চ স্থিতিস্থাপকতা (High Resilience):** বাইরের কোনো সার্ভার স্লো বা ডাউন হলেও আমাদের অ্যাপের মূল ফিচার সচল থাকে।
+- 🔄 **সহজ পরিবর্তনযোগ্যতা:** কোনো প্রোভাইডার বদলাতে হলে শুধু `lib/providers/` এর ওই নির্দিষ্ট ফাইলটি আপডেট করলেই চলে।

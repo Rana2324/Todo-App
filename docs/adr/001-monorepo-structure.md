@@ -1,20 +1,57 @@
-# ADR 001: Monorepo Structure & Route-Local Organization
+# ADR 001: মনোরেপো কাঠামো এবং রুট-লোকাল অর্গানাইজেশন (Monorepo Structure & Route-Local Organization)
 
-## Status
-Accepted
+> **ADR কী?**  
+> *Architectural Decision Record (ADR)* হলো এমন একটি ডকুমেন্ট যেখানে প্রজেক্টের কোনো গুরুত্বপূর্ণ আর্কিটেকচারাল সিদ্ধান্ত কেন নেওয়া হয়েছে, তার কারণ এবং ফলাফল লিখে রাখা হয়।
 
-## Context
-In large enterprise applications like MEO Tool, codebases often suffer from monolithic tangling where components, actions, and utilities are dumped into a single global folder. This makes code ownership ambiguous, increases cognitive load, and slows down maintenance.
+## স্ট্যাটাস (Status)
+**গৃহীত (Accepted)** ✅
 
-## Decision
-We adopted a **monorepo structure** partitioned into `apps/` and `packages/`:
-1. **`apps/web`**: Contains the Next.js application shell, routes, local UI components, and domain business services.
-2. **Route-Local Folders (`_components/` and `_lib/`)**:
-   - Any component or Server Action used solely by a single route (e.g. `(dashboard)/todos/_components/TodoForm.tsx` or `(dashboard)/todos/_lib/actions.ts`) lives directly inside that route folder.
-   - Global components in `components/ui` or `components/shared` are reserved strictly for cross-cutting primitives (Radix UI wrappers, Navigation bar, Theme providers).
-3. **`packages/`**: Scalable workspace boundaries (`packages/ui`, `packages/types`, `packages/utils`, `packages/config`) ready for internal package extraction when multiple client apps are introduced.
+---
 
-## Consequences
-- **High Cohesion**: Developers working on `/todos` find all related forms, dialogs, actions, and sub-views in one place.
-- **Clear Boundaries**: Eliminates sprawling global folders.
-- **Easy Refactoring**: Deleting or refactoring a feature route naturally deletes all its private components without leaving dead code in global directories.
+## প্রেক্ষাপট ও সমস্যা (Context & Problem)
+বড় মাপের এন্টারপ্রাইজ প্রজেক্টে (যেমন MEO Tool) কোডবেস বড় হওয়ার সাথে সাথে প্রায়ই একটি সমস্যা দেখা যায়—সব কম্পোনেন্ট, অ্যাকশন এবং ইউটিলিটি ফাংশন একটিমাত্র গ্লোবাল ফোল্ডারে রেখে দেওয়া হয় (Monolithic Tangling)।
+
+### এর ফলে কী কী সমস্যা হয়?
+1. **বোঝার জটিলতা (Cognitive Overload):** কোনো পেজের জন্য কোন কম্পোনেন্ট কাজ করছে তা সহজে বোঝা যায় না।
+2. **কোডের মালিকানা অস্পষ্ট হওয়া:** কোন কোড কার বা কোন পেজের উপর নির্ভরশীল তা ট্র্যাক করা কঠিন হয়ে পড়ে।
+3. **অব্যবহৃত কোড (Dead Code):** কোনো ফিচার ডিলিট করার পর তার গ্লোবাল কম্পোনেন্টগুলো থেকে যায়, যা প্রোজেক্ট ভারী করে।
+
+---
+
+## গৃহীত সিদ্ধান্ত (Our Decision)
+আমরা পুরো প্রজেক্টকে একটি সুশৃঙ্খল **Monorepo (মনোরেপো)** কাঠামোতে ভাগ করেছি যা মূলত `apps/` এবং `packages/` অংশে বিভক্ত:
+
+```
+todo-project/
+├── apps/
+│   └── web/                   # মূল Next.js অ্যাপ্লিকেশনের শেল ও রুটস
+│       ├── app/
+│       │   ├── (auth)/        # লগইন/রেজিস্ট্রেশন রুট গ্রুপ
+│       │   └── (dashboard)/
+│       │       └── todos/     # টুডু ফিচার রুট
+│       │           ├── _components/  # রুট-লোকাল UI কম্পোনেন্ট (TodoForm, TodoItem)
+│       │           ├── _lib/         # রুট-লোকাল সার্ভার অ্যাকশন (actions.ts)
+│       │           └── page.tsx      # রুট পেজ
+│       ├── components/ui/     # সর্বজনীন গ্লোবাল প্রিম্যাকটিভস (Radix UI / Shadcn)
+│       └── lib/               # বিজনেস সার্ভিস ও ডোমেন লজিক
+└── packages/                  # ভবিষ্যতে রিইউজেবল প্যাকেজ হিসেবে ব্যবহারের জন্য
+    ├── ui/
+    ├── types/
+    └── utils/
+```
+
+### প্রধান নিয়মসমূহ (Key Rules):
+1. **রুট-লোকাল ফোল্ডার (`_components/` এবং `_lib/`):**  
+   যদি কোনো কম্পোনেন্ট বা সার্ভার অ্যাকশন কেবল একটি নির্দিষ্ট রুটের কাজে লাগে (যেমন: `TodoForm.tsx` বা `todos/_lib/actions.ts`), তবে সেটিকে সরাসরি সেই রুট ফোল্ডারের ভেতরেই রাখতে হবে।
+2. **গ্লোবাল কম্পোনেন্ট (`components/ui` বা `components/shared`):**  
+   কেবলমাত্র যেগুলো পুরো অ্যাপ জুড়ে একাধিক জায়গায় ব্যবহৃত হয় (যেমন: বোতাম, ইনপুট বক্স, ন্যাভবার, থিম সুইচ) সেগুলো গ্লোবাল থাকবে।
+3. **মনোরেপো বাউন্ডারি (`packages/`):**  
+   ভবিষ্যতে যদি মোবাইল অ্যাপ বা আলাদা কোনো ক্লায়েন্ট যোগ করতে হয়, তবে সহজে যেন শেয়ার্ড কোড আলাদা প্যাকেজে নেওয়া যায়।
+
+---
+
+## ফলাফল ও সুবিধা (Consequences & Benefits)
+
+- 🎯 **উচ্চ সংহতি (High Cohesion):** `/todos` ফিচারের উপর কাজ করা ডেভেলপার এক জায়গাতেই সব ফর্ম, ডায়ালগ এবং অ্যাকশন পেয়ে যান।
+- 🧱 **স্পষ্ট সীমানা (Clear Boundaries):** প্রজেক্টে এলোমেলো ফাইল ছড়ানোর সুযোগ নেই।
+- 🧹 **সহজ রিফ্যাক্টরিং ও ডিলিট:** কোনো ফিচার বা রুট মুছে দিলে তার সাথে সংশ্লিষ্ট সব প্রাইভেট কম্পোনেন্টও স্বয়ংক্রিয়ভাবে মুছে যায়, কোনো ডেড কোড থাকে না।

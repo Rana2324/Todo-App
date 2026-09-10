@@ -1,22 +1,50 @@
-# ADR 003: Authentication & Cryptographic Token Sharing (Better Auth + PASETO)
+# ADR 003: অথেনটিকেশন এবং ক্রিপ্টোগ্রাফিক টোকেন শেয়ারিং (Better Auth + PASETO)
 
-## Status
-Accepted
+> **অথেনটিকেশন ও টোকেন কী?**  
+> - **অথেনটিকেশন (Authentication):** একজন ব্যবহারকারী আসলেই তিনি কিনা (যেমন: ইমেইল ও পাসওয়ার্ড যাচাই করা)।
+> - **PASETO টোকেন:** একটি বিশেষ এনক্রিপ্টেড সিক্রেট চাবি, যা দিয়ে কোনো ডাটাবেস টেবিল ছাড়াই নিরাপদে কোনো রিসোর্স (যেমন টুডু) বাইরে অন্যদের সাথে শেয়ার করা যায়।
 
-## Context
-Applications require two distinct identity & authorization patterns:
-1. **User Authentication & Session Management**: Stateful session verification, password hashing, and role-based access control (RBAC).
-2. **Stateless Public Resource Sharing**: Allowing a user to share an individual resource (e.g. a specific todo) with unauthenticated external users without exposing their credentials or opening up arbitrary database access.
+## স্ট্যাটাস (Status)
+**গৃহীত (Accepted)** ✅
 
-## Decision
-1. **Better Auth**: Selected for user management, credential authentication, session cookies (`better-auth.session_token`), and administrative role guards (`user.role === 'admin'`).
-2. **Route Guarding (`proxy.ts`)**: Evaluates incoming request session cookies and redirects unauthenticated traffic to `/login` before rendering protected dashboard routes.
-3. **PASETO (Platform-Agnostic Security Tokens) v4 Local**:
-   - Used for the `/share/[token]` capability.
-   - Symmetric authenticated encryption (`v4.local`) using `paseto-ts` with a 256-bit key (`PASETO_LOCAL_KEY`).
-   - Encrypts the payload `{ todoId }` into an opaque, tamper-proof token string with built-in expiration.
-   - Prevents predictable ID harvesting and guarantees token authenticity without requiring a separate "shares" table in the database.
+---
 
-## Consequences
-- **Robust Security**: Session management is standards-compliant and immune to common JWT vulnerabilities (e.g. algorithm confusion).
-- **Stateless Sharing**: Share links are self-contained and cryptographically verified at zero database overhead for token validation.
+## প্রেক্ষাপট ও চ্যালেঞ্জ (Context & Challenge)
+আমাদের অ্যাপ্লিকেশনে দুটি ভিন্ন ধরনের আইডেন্টিটি এবং পারমিশন প্রয়োজন ছিল:
+1. **ইউজার লগইন ও সেশন ম্যানেজমেন্ট:** ব্যবহারকারীর অ্যাকাউন্ট সুরক্ষিত রাখা, পাসওয়ার্ড হ্যাশ করা এবং অ্যাডমিন রোল চেক করা।
+2. **স্টেটলেস পাবলিক শেয়ারিং:** ব্যবহারকারী যেন তার তৈরি করা কোনো একটি নির্দিষ্ট টুডু বাইরের যে কারও সাথে একটি লিংকের মাধ্যমে শেয়ার করতে পারেন (লগইন ছাড়াই), অথচ আমাদের ডাটাবেসে যেন বাড়তি টেবিল বা আইডি হ্যাক হওয়ার ঝুঁকি না থাকে।
+
+---
+
+## গৃহীত সিদ্ধান্ত (Our Decision)
+
+### ১. বেটার অথ (Better Auth):
+- ব্যবহারকারীর রেজিস্ট্রেশন, ইমেইল/পাসওয়ার্ড লগইন এবং সেশন ব্যবস্থাপনার জন্য **Better Auth** ফ্রেমওয়ার্ক ব্যবহার করা হয়েছে।
+- সেশন ট্র্যাকিংয়ের জন্য নিরাপদ `better-auth.session_token` কুকি (HttpOnly, Secure) ব্রাউজারে সেট হয়।
+- অ্যাডমিনদের জন্য রোল গার্ড ব্যবস্থা (`user.role === 'admin'`) অন্তর্ভুক্ত।
+
+### ২. রুট গার্ডিং (`proxy.ts`):
+- কোনো ব্যবহারকারী লগইন ছাড়া সুরক্ষিত ড্যাশবোর্ড পেজে (যেমন `/todos`, `/profile`) যাওয়ার চেষ্টা করলে `proxy.ts` ফাইলটি তাকে স্বয়ংক্রিয়ভাবে `/login` পেজে রিডাইরেক্ট করে দেয়।
+
+### ৩. পেসেটো (PASETO - Platform-Agnostic Security Tokens) v4 Local:
+- টুডু শেয়ার করার জন্য `/share/[token]` কার্যপদ্ধতিতে **PASETO v4 Local** এনক্রিপশন ব্যবহার করা হয়েছে।
+- এটি একটি ২৫৬-বিট সিমেট্রিক কি (`PASETO_LOCAL_KEY`) ব্যবহার করে `{ todoId }` ডাটাকে এমন এক এনক্রিপ্টেড স্ট্রিং-এ পরিণত করে যা কেউ নকল বা পরিবর্তন করতে পারে না।
+- এতে স্বয়ংক্রিয় এক্সপায়ার টাইম বিল্ট-ইন থাকে।
+
+```
+[ইউজার 'Share' বাটনে চাপ দিলেন] 
+              │
+              ▼
+   { todoId: "abc-123" } 
+              │ (২৫৬-বিট কি দিয়ে এনক্রিপ্ট)
+              ▼
+  "v4.local.k7j8...a9b2"  ──►  শেয়ারযোগ্য লিংক: /share/v4.local.k7j8...a9b2
+```
+
+---
+
+## ফলাফল ও সুবিধা (Consequences & Benefits)
+
+- 🔒 **উন্নত নিরাপত্তা:** ঐতিহ্যবাহী JWT টোকেনের সাধারণ ত্রুটিসমূহ (যেমন Algorithm Confusion Attack) থেকে PASETO সম্পূর্ণ নিরাপদ।
+- ⚡ **ডাটাবেস লোড শূন্য:** শেয়ার করা লিংক ভ্যালিডেট করতে ডাটাবেসে কোনো আলাদা 'shares' টেবিল খুঁজতে হয় না; টোকেনটি ডিক্রিপ্ট করলেই তার সত্যতা যাচাই হয়ে যায়।
+- 🚫 **আইডি চুরি প্রতিরোধ:** ডাটাবেসের অভ্যন্তরীণ ID (যেমন: 1, 2, 3) সরাসরি লিংকে প্রকাশ পায় না, ফলে কেউ আইডি পরিবর্তন করে অন্যের তথ্য দেখতে পারে না।

@@ -1,17 +1,34 @@
-# Use Case: Admin Role Authorization & User Directory Auditing
+# ইউজ কেস: অ্যাডমিন রোল অথরাইজেশন ও ইউজার ডিরেক্টরি অডিটিং (Admin Auditing)
 
-## Primary Actor
-System Administrator (`role === "admin"`)
+> **ইউজ কেস কী?**  
+> একজন ব্যবহারকারী সিস্টেমে কোনো একটি নির্দিষ্ট লক্ষ্য অর্জনের জন্য শুরু থেকে শেষ পর্যন্ত যে যে ধাপে কাজ করেন, তার বাস্তব বিবরণই হলো ইউজ কেস।
 
-## Pre-conditions
-- User has logged in with an account having `role: "admin"` in the Better Auth database.
+---
 
-## Main Success Scenario
-1. Administrator navigates to `/admin/overview` or `/admin/users`.
-2. Server Component calls `isAdmin()`. The helper reads the caller's session from headers and verifies `session.user.role === "admin"`.
-3. `/admin/overview` renders the admin navigation hub and summary statistics.
-4. `/admin/users` invokes `auth.api.listUsers()` to retrieve registered users.
-5. System renders an administrative audit table showing names, email addresses, and roles across all registered accounts.
+## 👤 প্রধান চরিত্র বা অ্যাক্টর (Primary Actor)
+সিস্টেম অ্যাডমিনিস্ট্রেটর (`role === "admin"`)
 
-## Alternative Scenarios
-- **Unauthorized Access Attempt**: If a standard user (`role: "user"`) attempts to visit `/admin/*`, `isAdmin()` evaluates to false and immediately executes `redirect("/todos")`.
+---
+
+## 📋 পূর্বশর্ত (Pre-conditions)
+- ব্যবহারকারী এমন একটি অ্যাকাউন্ট দিয়ে লগইন করেছেন যার ডাটাবেস রোলে `role: "admin"` দেওয়া আছে।
+
+---
+
+## 🚀 মূল সফল দৃশ্যপট (Main Success Scenario)
+
+1. **পেজে প্রবেশ:** অ্যাডমিনিস্ট্রেটর ব্রাউজারে `/admin/overview` অথবা `/admin/users` পেজে যান।
+2. **সার্ভার-সাইড রোল যাচাই:** সার্ভার কম্পোনেন্ট `isAdmin()` হেল্পার ফাংশনকে কল করে। এটি রিকোয়েস্ট হেডার থেকে সেশন পড়ে এবং নিশ্চিত করে যে `session.user.role === "admin"`।
+3. **ওভারভিউ রেন্ডারিং:** `/admin/overview` পেজটি অ্যাডমিন ন্যাভিগেশন মেনু এবং সিস্টেমের সামগ্রিক পরিসংখ্যান প্রদর্শন করে।
+4. **ইউজার তালিকা সংগ্রহ:** `/admin/users` পেজটি Better Auth-এর `auth.api.listUsers()` মেথড ব্যবহার করে ডাটাবেস থেকে সব নিবন্ধিত ইউজারের তালিকা সংগ্রহ করে।
+5. **অডিট টেবিল প্রদর্শন:** সিস্টেমে একটি পরিচ্ছন্ন অ্যাডমিন টেবিল রেন্ডার হয়, যেখানে প্রত্যেক ইউজারের নাম, ইমেইল অ্যাড্রেস, তৈরি হওয়ার সময় এবং তাদের রোল প্রদর্শিত হয়।
+
+---
+
+## ⚠️ বিকল্প দৃশ্যপট (Alternative Scenarios)
+
+### সাধারণ ইউজারের অনধিকার প্রবেশের চেষ্টা (Unauthorized Access):
+- কোনো সাধারণ ইউজার (`role: "user"`) যদি সরাসরি ব্রাউজারের URL বারে `/admin/*` লিখে প্রবেশের চেষ্টা করেন:
+  1. সার্ভারের `isAdmin()` ফাংশন মিথ্যা (`false`) রিটার্ন করে।
+  2. সাথে সাথে Next.js-এর `redirect("/todos")` ফাংশন ট্রিগার হয়।
+  3. ব্যবহারকারীকে অ্যাডমিন পেজ দেখতে না দিয়ে স্বয়ংক্রিয়ভাবে তার নিজস্ব টুডু ড্যাশবোর্ডে পাঠিয়ে দেওয়া হয়।

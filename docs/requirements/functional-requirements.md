@@ -1,42 +1,57 @@
-# Functional Requirements Specification (FRS)
+# ফাংশনাল রিকোয়ারমেন্টস স্পেসিফিকেশন (Functional Requirements Specification - FRS)
 
-This document outlines all functional requirements fulfilled by the application.
+> **ফাংশনাল রিকোয়ারমেন্টস কী?**  
+> একটি সফটওয়্যার সিস্টেমে ব্যবহারকারী কী কী কাজ করতে পারবেন এবং সিস্টেম কীভাবে সেই কাজগুলোর প্রতিক্রিয়া জানাবে—তার বিস্তারিত তালিকাই হলো ফাংশনাল রিকোয়ারমেন্টস।
 
-## FR-01: Authentication & User Management
-- **FR-01.1 Registration**: Users can register with full name, email, and password (minimum 6 characters) via `/registration`.
-- **FR-01.2 Login**: Registered users can authenticate via `/login` and receive a secure HTTP-only session cookie.
-- **FR-01.3 Session Termination**: Users can sign out from any view via the shared Navbar or Profile menu.
-- **FR-01.4 Password Management**: Users can update their account password via `/change-password` with option to revoke active secondary sessions.
-- **FR-01.5 Profile Inspection**: Authenticated users can view their account metadata, role, ID, and session expiration at `/profile`.
+---
 
-## FR-02: Route Protection & Authorization (RBAC)
-- **FR-02.1 Route Guarding**: Unauthenticated visits to `/todos`, `/profile`, or `/admin` are intercepted by `proxy.ts` and redirected to `/login`.
-- **FR-02.2 Admin RBAC**: Non-admin users attempting to access `/admin/overview` or `/admin/users` are redirected to `/todos`.
-- **FR-02.3 User Directory Auditing**: Authorized administrators can inspect all registered user accounts at `/admin/users`.
+## 🔐 FR-01: অথেনটিকেশন ও ইউজার ম্যানেজমেন্ট (Authentication)
+- **FR-01.1 রেজিস্ট্রেশন (Registration):** ব্যবহারকারী তার পূর্ণ নাম, ইমেইল এবং ন্যূনতম ৬ অক্ষরের পাসওয়ার্ড দিয়ে `/registration` পেজ থেকে নতুন অ্যাকাউন্ট খুলতে পারবেন।
+- **FR-01.2 লগইন (Login):** নিবন্ধিত ব্যবহারকারী `/login` পেজে ইমেইল ও পাসওয়ার্ড প্রদান করে লগইন করতে পারবেন এবং ব্রাউজারে নিরাপদ সেশন কুকি পাবেন।
+- **FR-01.3 লগআউট (Sign Out):** ন্যাভবার বা প্রোফাইল মেনু থেকে এক ক্লিকে যেকোনো পেজ থেকে লগআউট করা যাবে।
+- **FR-01.4 পাসওয়ার্ড পরিবর্তন (Password Change):** `/change-password` পেজে গিয়ে ব্যবহারকারী তার বর্তমান পাসওয়ার্ড দিয়ে নতুন পাসওয়ার্ড সেট করতে পারবেন এবং অন্য ডিভাইসের সেশন লগআউট করার সুযোগ পাবেন।
+- **FR-01.5 প্রোফাইল পরিদর্শন (Profile Inspection):** ব্যবহারকারী `/profile` পেজে তার অ্যাকাউন্টের বিবরণ, রোল (Role), আইডি এবং সেশনের মেয়াদ দেখতে পাবেন।
 
-## FR-03: Todo Lifecycle Management
-- **FR-03.1 Creation**: Users can create todos with a required title (1–200 characters) and optional details/body (up to 2000 characters).
-- **FR-03.2 Persistence**: All todos are persisted in PostgreSQL via Drizzle ORM.
-- **FR-03.3 Tenant Isolation**: Every user only sees and modifies their own todos.
-- **FR-03.4 Status Toggling**: Users can toggle todos between pending and completed states.
-- **FR-03.5 Inline & Modal Editing**: Users can edit title and description of existing todos.
-- **FR-03.6 Deletion**: Users can delete todos with confirmation.
-- **FR-03.7 Filtering & Searching**: Users can filter todos by status (all, active, completed) and search by keyword.
+---
 
-## FR-04: AI-Assisted Task Planning
-- **FR-04.1 Task Generation**: Users can enter a prompt (e.g. "Prepare for presentation") and receive 1–3 structured task suggestions powered by OpenAI `gpt-4o-mini`.
-- **FR-04.2 Suggestion Adoption**: Users can click an AI suggestion to automatically populate and create a new Todo item.
+## 🛡️ FR-02: রুট প্রোটেকশন ও রোল-বেসড এক্সেস কন্ট্রোল (RBAC)
+- **FR-02.1 সুরক্ষিত রুট গার্ড (Route Guarding):** লগইন ছাড়া কোনো ব্যবহারকারী `/todos`, `/profile` বা `/admin` পেজে প্রবেশের চেষ্টা করলে `proxy.ts` তাকে স্বয়ংক্রিয়ভাবে `/login` পেজে পাঠিয়ে দেবে।
+- **FR-02.2 অ্যাডমিন পারমিশন গার্ড (Admin RBAC):** সাধারণ ব্যবহারকারী (`role: "user"`) যদি `/admin/*` পেজে যেতে চান, সিস্টেম তাকে সরাসরি `/todos` ড্যাশবোর্ডে পাঠিয়ে দেবে।
+- **FR-02.3 ইউজার ডিরেক্টরি অডিট (User Directory Audit):** অনুমোদিত অ্যাডমিনিস্ট্রেটরগণ `/admin/users` পেজে সব নিবন্ধিত ব্যবহারকারীর তালিকা (নাম, ইমেইল, রোল) দেখতে পাবেন।
 
-## FR-05: Geolocation & Social Insights
-- **FR-05.1 Place Search**: Users can search for physical venues via Geoapify Geocoding API.
-- **FR-05.2 Location Attachment**: Users can attach a selected place (ID, name, latitude, longitude) to any Todo.
-- **FR-05.3 Business & Social Intelligence**: Viewing an attached place displays real or mock Google Business Profile ratings/hours and Instagram feed media.
+---
 
-## FR-06: Media Attachment & Optimization
-- **FR-06.1 Image Upload**: Users can attach an image to a Todo item.
-- **FR-06.2 Optimization**: Uploaded images are automatically resized to max 800px width and converted to WebP format via Sharp.
-- **FR-06.3 Dual Storage**: Uploads are stored in AWS S3 when configured or cached locally in `public/uploads/` during local development.
+## 📝 FR-03: টুডু লাইফসাইকেল ম্যানেজমেন্ট (Todo Management)
+- **FR-03.1 নতুন টুডু তৈরি (Creation):** ব্যবহারকারী টাইটেল (১–২০০ অক্ষর) এবং ঐচ্ছিক বর্ণনা (সর্বোচ্চ ২০০০ অক্ষর) দিয়ে নতুন কাজ যুক্ত করতে পারবেন।
+- **FR-03.2 সংরক্ষণ (Persistence):** সকল টুডু Drizzle ORM-এর মাধ্যমে PostgreSQL ডাটাবেসে স্থায়ীভাবে সংরক্ষিত হবে।
+- **FR-03.3 ব্যবহারকারীভিত্তিক নিরাপত্তা (Tenant Isolation):** একজন ব্যবহারকারী কেবল তার নিজের তৈরি করা টুডুই দেখতে এবং পরিচালনা করতে পারবেন।
+- **FR-03.4 স্ট্যাটাস পরিবর্তন (Status Toggling):** টুডুর কাজ সম্পন্ন (Completed) বা বাকি (Pending) হিসেবে চিহ্নিত করা যাবে।
+- **FR-03.5 এডিটিং (Editing):** বিদ্যমান যেকোনো টুডুর টাইটেল ও বিবরণ পরিবর্তন বা আপডেট করা যাবে।
+- **FR-03.6 মুছে ফেলা (Deletion):** নিশ্চিতকরণ ডায়ালগের মাধ্যমে অপ্রয়োজনীয় টুডু চিরতরে মুছে ফেলা যাবে।
+- **FR-03.7 ফিল্টারিং ও সার্চ (Filtering & Search):** স্ট্যাটাস অনুযায়ী (সব, চলমান, সম্পন্ন) টুডু ফিল্টার করা এবং কী-ওয়ার্ড দিয়ে সার্চ করা যাবে।
 
-## FR-07: PASETO Cryptographic Sharing
-- **FR-07.1 Share Token Generation**: Users can generate a secure, encrypted PASETO v4 local token for any owned Todo.
-- **FR-07.2 Public Share Access**: Unauthenticated visitors can view the shared Todo at `/share/[token]` with verified cryptographic integrity.
+---
+
+## 🤖 FR-04: AI-ভিত্তিক টাস্ক প্ল্যানিং (AI Task Planning)
+- **FR-04.1 টাস্ক জেনারেশন (Task Generation):** ব্যবহারকারী কোনো লক্ষ্যের প্রম্পট (যেমন: "পরীক্ষার প্রস্তুতি") দিলে OpenAI `gpt-4o-mini` স্বয়ংক্রিয়ভাবে ১ থেকে ৩টি গঠনমূলক কাজের প্রস্তাবনা তৈরি করে দেবে।
+- **FR-04.2 সাজেশন যুক্তকরণ (Suggestion Adoption):** AI সাজেশনের কার্ডে ক্লিক করলেই তা সাথে সাথে ব্যবহারকারীর টুডু তালিকায় যুক্ত হয়ে যাবে।
+
+---
+
+## 📍 FR-05: জিওলোকেশন ও সোশ্যাল ইন্টিগ্রেশন (Geo & Social)
+- **FR-05.1 স্থান সার্চ (Place Search):** ব্যবহারকারী Geoapify Places API ব্যবহার করে রেস্তোরাঁ, অফিস বা যেকোনো স্থান সার্চ করতে পারবেন।
+- **FR-05.2 লোকেশন সংযুক্তকরণ (Location Attachment):** নির্বাচিত স্থানটি টুডু আইটেমের সাথে সংযুক্ত করে রাখা যাবে।
+- **FR-05.3 সোশ্যাল ও বিজনেস ইনসাইট (Place Insights):** লোকেশনে ক্লিক করলে Google Business Profile-এর রেটিং/খোলার সময় এবং Instagram-এর সাম্প্রতিক পোস্ট প্রদর্শিত হবে।
+
+---
+
+## 🖼️ FR-06: ছবি আপলোড ও অপটিমাইজেশন (Media Attachment)
+- **FR-06.1 ইমেজ আপলোড (Image Upload):** টুডুতে যেকোনো প্রয়োজনীয় ছবি সংযুক্ত করা যাবে।
+- **FR-06.2 স্বয়ংক্রিয় অপটিমাইজেশন (Optimization):** আপলোড করা ছবি Sharp লাইব্রেরির মাধ্যমে রিসাইজ (সর্বোচ্চ 800px) এবং আধুনিক WebP ফরম্যাটে সংকুচিত হবে।
+- **FR-06.3 ডুয়েল স্টোরেজ (Dual Storage):** AWS S3 কনফিগার করা থাকলে ক্লাউডে, নতুবা লোকাল ফোল্ডারে (`public/uploads/`) সংরক্ষিত হবে।
+
+---
+
+## 🔗 FR-07: PASETO ক্রিপ্টোগ্রাফিক শেয়ারিং (Cryptographic Sharing)
+- **FR-07.1 সিকিউর শেয়ার টোকেন তৈরি (Token Generation):** ব্যবহারকারী তার যেকোনো টুডুর জন্য একটি এনক্রিপ্টেড PASETO v4 টোকেন লিংক তৈরি করতে পারবেন।
+- **FR-07.2 পাবলিক অ্যাক্সেস (Public Share Access):** যে কেউ কোনো লগইন ছাড়াই `/share/[token]` লিংকের মাধ্যমে নির্দিষ্ট টুডুটি দেখতে পারবেন, কিন্তু পরিবর্তন করতে পারবেন না।
