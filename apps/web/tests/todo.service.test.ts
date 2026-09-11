@@ -8,11 +8,19 @@ vi.mock("@/drizzle/todo.repository", () => ({
     toggle: vi.fn(),
     remove: vi.fn(),
     setImage: vi.fn(),
+    clearImage: vi.fn(),
     attachPlace: vi.fn(),
   },
 }));
 
+vi.mock("@/lib/services/upload.service", () => ({
+  uploadService: {
+    deleteTodoImage: vi.fn(),
+  },
+}));
+
 import { todoRepository } from "@/drizzle/todo.repository";
+import { uploadService } from "@/lib/services/upload.service";
 import { todoService } from "@/lib/services/todo.service";
 
 const mockRow = {
@@ -119,6 +127,26 @@ describe("todoService", () => {
       "/uploads/user-1/todo-1.webp",
     );
     expect(result.imageUrl).toBe("/uploads/user-1/todo-1.webp");
+  });
+
+  it("removeImage deletes the stored file, then clears the DB column", async () => {
+    vi.mocked(uploadService.deleteTodoImage).mockResolvedValue(undefined);
+    vi.mocked(todoRepository.clearImage).mockResolvedValue({
+      ...mockRow,
+      imageUrl: null,
+    });
+
+    const result = await todoService.removeImage("user-1", mockRow.id);
+
+    expect(uploadService.deleteTodoImage).toHaveBeenCalledWith(
+      "user-1",
+      mockRow.id,
+    );
+    expect(todoRepository.clearImage).toHaveBeenCalledWith(
+      mockRow.id,
+      "user-1",
+    );
+    expect(result.imageUrl).toBeUndefined();
   });
 
   it("attachPlace stores the place and maps it into a nested place object", async () => {

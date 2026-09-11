@@ -31,10 +31,59 @@ describe("TodoForm", () => {
     );
     await user.click(screen.getByRole("button", { name: "Add" }));
 
-    expect(onAdd).toHaveBeenCalledWith("Buy milk", "2% milk");
+    expect(onAdd).toHaveBeenCalledWith("Buy milk", "2% milk", undefined);
     expect(screen.getByPlaceholderText("What do you need to do?")).toHaveValue(
       "",
     );
+  });
+
+  it("passes the selected image file to onAdd and shows/clears a preview", async () => {
+    const user = userEvent.setup();
+    const onAdd = vi.fn();
+
+    render(<TodoForm onAdd={onAdd} />);
+
+    await user.type(
+      screen.getByPlaceholderText("What do you need to do?"),
+      "Buy milk",
+    );
+
+    const file = new File(["fake-image-bytes"], "milk.png", {
+      type: "image/png",
+    });
+    const fileInput = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    await user.upload(fileInput, file);
+
+    expect(
+      await screen.findByRole("button", { name: /remove/i }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(onAdd).toHaveBeenCalledWith("Buy milk", "", file);
+  });
+
+  it("rejects an oversized image before it reaches onAdd", async () => {
+    const user = userEvent.setup();
+    const onAdd = vi.fn();
+
+    render(<TodoForm onAdd={onAdd} />);
+
+    const oversized = new File(
+      [new Uint8Array(5 * 1024 * 1024 + 1)],
+      "big.png",
+      { type: "image/png" },
+    );
+    const fileInput = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    await user.upload(fileInput, oversized);
+
+    expect(
+      screen.queryByRole("button", { name: /remove/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("does not call onAdd when the title is empty", async () => {

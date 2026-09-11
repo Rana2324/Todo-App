@@ -101,6 +101,16 @@ export const todoRepository = {
     return row;
   },
 
+  async clearImage(id: string, userId: string) {
+    const [row] = await db
+      .update(todos)
+      .set({ imageUrl: null, updatedAt: new Date() })
+      .where(and(eq(todos.id, id), eq(todos.userId, userId)))
+      .returning();
+
+    return row;
+  },
+
   async attachPlace(
     id: string,
     userId: string,

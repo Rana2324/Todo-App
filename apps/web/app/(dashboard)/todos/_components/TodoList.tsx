@@ -9,7 +9,8 @@ type TodoListProps = {
   onEdit: (id: string, title: string, body: string) => void;
   onDelete: (id: string) => void;
   onImageUpload: (id: string, file: File) => Promise<void>;
-  onShare: (id: string) => Promise<void>;
+  onImageRemove: (id: string) => Promise<void>;
+  onShare: (id: string) => Promise<string>;
   onAttachPlace: (id: string, place: Place) => Promise<void>;
 };
 
@@ -19,6 +20,7 @@ export default function TodoList({
   onEdit,
   onDelete,
   onImageUpload,
+  onImageRemove,
   onShare,
   onAttachPlace,
 }: TodoListProps) {
@@ -32,6 +34,7 @@ export default function TodoList({
           onEdit={onEdit}
           onDelete={onDelete}
           onImageUpload={onImageUpload}
+          onImageRemove={onImageRemove}
           onShare={onShare}
           onAttachPlace={onAttachPlace}
         />

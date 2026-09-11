@@ -1,7 +1,7 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 
 import { isS3Configured } from "@/lib/env";
@@ -49,5 +49,29 @@ export const uploadService = {
     await writeFile(path.join(localDir, `${todoId}.webp`), optimized);
 
     return `/uploads/${userId}/${todoId}.webp`;
+  },
+
+  /** Deletes the stored image for a todo, on S3 or the local fallback. */
+  async deleteTodoImage(userId: string, todoId: string): Promise<void> {
+    const key = `todos/${userId}/${todoId}.webp`;
+
+    if (isS3Configured()) {
+      const bucket = process.env.AWS_S3_BUCKET!;
+
+      await getS3Client().send(
+        new DeleteObjectCommand({ Bucket: bucket, Key: key }),
+      );
+
+      return;
+    }
+
+    const localPath = path.join(
+      process.cwd(),
+      "public",
+      "uploads",
+      userId,
+      `${todoId}.webp`,
+    );
+    await rm(localPath, { force: true });
   },
 };

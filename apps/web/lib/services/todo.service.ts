@@ -1,4 +1,5 @@
 import { todoRepository } from "@/drizzle/todo.repository";
+import { uploadService } from "./upload.service";
 
 import type { CreateTodoInput, TodoQuery, UpdateTodoInput } from "@/schema/todo";
 import type { AttachPlaceInput } from "@/schema/place";
@@ -69,6 +70,12 @@ export const todoService = {
     imageUrl: string,
   ): Promise<TodoType> {
     const row = await todoRepository.setImage(id, userId, imageUrl);
+    return toTodoType(row);
+  },
+
+  async removeImage(userId: string, id: string): Promise<TodoType> {
+    await uploadService.deleteTodoImage(userId, id);
+    const row = await todoRepository.clearImage(id, userId);
     return toTodoType(row);
   },
 

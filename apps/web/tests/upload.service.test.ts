@@ -1,4 +1,4 @@
-import { readFile, rm } from "node:fs/promises";
+import { access, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 
 import sharp from "sharp";
@@ -49,5 +49,39 @@ describe("uploadService (mock mode — no AWS creds in test env)", () => {
 
     expect(metadata.format).toBe("webp");
     expect(metadata.width).toBeLessThanOrEqual(800);
+  });
+
+  it("deleteTodoImage removes the local fallback file", async () => {
+    const input = await sharp({
+      create: {
+        width: 100,
+        height: 100,
+        channels: 3,
+        background: { r: 0, g: 0, b: 255 },
+      },
+    })
+      .png()
+      .toBuffer();
+
+    await uploadService.uploadTodoImage(input, TEST_USER_ID, "test-todo");
+
+    const savedPath = path.join(
+      process.cwd(),
+      "public",
+      "uploads",
+      TEST_USER_ID,
+      "test-todo.webp",
+    );
+    await expect(access(savedPath)).resolves.toBeUndefined();
+
+    await uploadService.deleteTodoImage(TEST_USER_ID, "test-todo");
+
+    await expect(access(savedPath)).rejects.toThrow();
+  });
+
+  it("deleteTodoImage is a no-op when no file was ever uploaded", async () => {
+    await expect(
+      uploadService.deleteTodoImage(TEST_USER_ID, "never-uploaded"),
+    ).resolves.toBeUndefined();
   });
 });

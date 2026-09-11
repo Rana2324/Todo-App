@@ -13,7 +13,7 @@ import { aiPromptSchema } from "@/schema/ai";
 import { attachPlaceSchema } from "@/schema/place";
 import { createTodoSchema, todoIdSchema, updateTodoSchema } from "@/schema/todo";
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
+import { MAX_IMAGE_BYTES } from "./image";
 
 export async function createTodo(input: { title: string; body?: string }) {
   const userId = await requireUserId();
@@ -92,6 +92,17 @@ export async function uploadImage(formData: FormData) {
   const imageUrl = await uploadService.uploadTodoImage(buffer, userId, todoId);
 
   const updated = await todoService.setImage(userId, todoId, imageUrl);
+
+  revalidatePath("/todos");
+
+  return updated;
+}
+
+export async function removeImage(id: string) {
+  const userId = await requireUserId();
+  todoIdSchema.parse(id);
+
+  const updated = await todoService.removeImage(userId, id);
 
   revalidatePath("/todos");
 

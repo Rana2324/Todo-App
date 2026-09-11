@@ -12,6 +12,7 @@ import {
   createShareLink,
   createTodo,
   deleteTodo as deleteTodoAction,
+  removeImage as removeImageAction,
   toggleTodo as toggleTodoAction,
   updateTodo,
   uploadImage as uploadImageAction,
@@ -26,10 +27,14 @@ type TodoProps = {
 export default function Todo({ initialTodos }: TodoProps) {
   const [todos, setTodos] = useState<TodoType[]>(initialTodos);
 
-  const addTodo = async (title: string, body: string) => {
+  const addTodo = async (title: string, body: string, imageFile?: File) => {
     try {
       const newTodo = await createTodo({ title, body });
       setTodos((currentTodos) => [...currentTodos, newTodo]);
+
+      if (imageFile) {
+        await uploadImage(newTodo.id, imageFile);
+      }
     } catch {
       toast.error("Could not add todo. Please try again.");
     }
@@ -85,15 +90,18 @@ export default function Todo({ initialTodos }: TodoProps) {
     }
   };
 
-  const shareTodo = async (id: string) => {
+  const removeImage = async (id: string) => {
     try {
-      const url = await createShareLink(id);
-      await navigator.clipboard.writeText(url);
-      toast.success("Link copied to clipboard!");
+      const updated = await removeImageAction(id);
+      setTodos((currentTodos) =>
+        currentTodos.map((todo) => (todo.id === id ? updated : todo)),
+      );
     } catch {
-      toast.error("Could not create share link. Please try again.");
+      toast.error("Could not remove image. Please try again.");
     }
   };
+
+  const shareTodo = (id: string) => createShareLink(id);
 
   const attachPlace = async (id: string, place: Place) => {
     try {
@@ -124,6 +132,7 @@ export default function Todo({ initialTodos }: TodoProps) {
         onEdit={editTodo}
         onDelete={deleteTodo}
         onImageUpload={uploadImage}
+        onImageRemove={removeImage}
         onShare={shareTodo}
         onAttachPlace={attachPlace}
       />

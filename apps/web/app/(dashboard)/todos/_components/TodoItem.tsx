@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { ImagePlus, Loader2, Share2 } from "lucide-react";
+import { ImagePlus, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 import EditTodo from "./EditTodo";
 import DeleteTodo from "./DeleteTodo";
+import ShareTodo from "./ShareTodo";
 import TodoPlace from "./TodoPlace";
 
 import type { TodoType } from "@/lib/domain/todo";
@@ -20,7 +21,8 @@ type TodoItemProps = {
   onEdit: (id: string, title: string, body: string) => void;
   onDelete: (id: string) => void;
   onImageUpload: (id: string, file: File) => Promise<void>;
-  onShare: (id: string) => Promise<void>;
+  onImageRemove: (id: string) => Promise<void>;
+  onShare: (id: string) => Promise<string>;
   onAttachPlace: (id: string, place: Place) => Promise<void>;
 };
 
@@ -30,12 +32,12 @@ export default function TodoItem({
   onEdit,
   onDelete,
   onImageUpload,
+  onImageRemove,
   onShare,
   onAttachPlace,
 }: TodoItemProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
 
   const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -48,12 +50,6 @@ export default function TodoItem({
     setIsUploading(true);
     await onImageUpload(todo.id, file);
     setIsUploading(false);
-  };
-
-  const handleShare = async () => {
-    setIsSharing(true);
-    await onShare(todo.id);
-    setIsSharing(false);
   };
 
   return (
@@ -111,20 +107,15 @@ export default function TodoItem({
           <span className="sr-only">Add image</span>
         </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleShare}
-          disabled={isSharing}
-        >
-          {isSharing ? <Loader2 className="animate-spin" /> : <Share2 />}
-          <span className="sr-only">Copy share link</span>
-        </Button>
+        <ShareTodo onCreateLink={() => onShare(todo.id)} />
 
         <EditTodo
           title={todo.title}
           body={todo.body ?? ""}
+          imageUrl={todo.imageUrl}
           onSave={(newTitle, newBody) => onEdit(todo.id, newTitle, newBody)}
+          onImageUpload={(file) => onImageUpload(todo.id, file)}
+          onImageRemove={() => onImageRemove(todo.id)}
         />
 
         <DeleteTodo onDelete={() => onDelete(todo.id)} />
